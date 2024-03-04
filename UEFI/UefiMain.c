@@ -17,6 +17,8 @@ EFI_STATUS EFIAPI UefiUnload(EFI_HANDLE ImageHandle)
 	return EFI_SUCCESS;
 }
 
+
+
 EFI_STATUS EFIAPI UefiMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
 {
 	gImageHandle = ImageHandle;

@@ -1,10 +1,13 @@
 #pragma once
-#include "hv.h"
+#include "Defs.h"
 
 
 namespace VUtils
 {
-	Command GetCommand(GuestVirtureAddress command_ptr);
+	Command GetCommand(GVA command_ptr);
 
-	void SetCommand(GuestVirtureAddress command_ptr, Command& command_data);
+	void SetCommand(GVA command_ptr, Command& command_data);
+
+	UINT32 GetCurrentCpuIndex();
+
 }

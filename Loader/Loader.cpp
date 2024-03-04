@@ -60,6 +60,7 @@ int main()
 
         g_MapperContext.test = RandomInt(1000,9999);
         g_MapperContext.RunWithSpoofer = 1;
+        g_MapperContext.RandomSeed = 970521;
         TextPrint("magic is " + std::to_string(g_MapperContext.test) + "\n", Green);
 
 

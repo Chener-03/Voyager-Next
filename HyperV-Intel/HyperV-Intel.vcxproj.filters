@@ -18,13 +18,13 @@
     <ClCompile Include="vmexit_handle.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="hv.cpp">
+    <ClCompile Include="VUtils.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="vutils.cpp">
+    <ClCompile Include="Memory.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="ept.cpp">
+    <ClCompile Include="Debug.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,19 +32,22 @@
     <ClInclude Include="ia32.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="types.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="hv.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="vutils.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="ept.h">
+    <ClInclude Include="VUtils.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="asm.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Defs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ShareData.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Debug.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

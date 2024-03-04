@@ -331,7 +331,7 @@ UINT64 BlUtlCopySmBiosTableHook(PSMBIOS3_TABLE_HEADER* HeaderCopy)
 	DisableInlineHook(&g_Hooks[BlUtlCopySmBiosTable]);
 	UINT64 Result = ((UINT64(*)(PSMBIOS3_TABLE_HEADER*))g_Hooks[BlUtlCopySmBiosTable].Address)(HeaderCopy);
 	EnableInlineHook(&g_Hooks[BlUtlCopySmBiosTable]);
-
+ 
 	if (Result == 0)
 	{
 		PSMBIOS3_TABLE_HEADER Header = *HeaderCopy;
@@ -340,7 +340,7 @@ UINT64 BlUtlCopySmBiosTableHook(PSMBIOS3_TABLE_HEADER* HeaderCopy)
 
 		BlMmMapPhysicalAddressExFunc(&currentAddress, Header->StructureTableAddress, Header->StructureTableMaximumSize, 0, 0);
 		UINT64 endAddress = (UINT64)currentAddress + Header->StructureTableMaximumSize;
-
+		auto freeAddress = currentAddress;
 		while (1)
 		{
 			SMBIOS_STRUCTURE* header = (SMBIOS_STRUCTURE*)currentAddress;
@@ -377,7 +377,7 @@ UINT64 BlUtlCopySmBiosTableHook(PSMBIOS3_TABLE_HEADER* HeaderCopy)
 			currentAddress = (unsigned char*)ptr;
 		}
 
-		BlMmUnmapVirtualAddressExFunc(currentAddress, Header->StructureTableMaximumSize, 0);
+		BlMmUnmapVirtualAddressExFunc(freeAddress, Header->StructureTableMaximumSize, 0);
 
 	}
 

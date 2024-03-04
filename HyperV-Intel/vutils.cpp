@@ -1,34 +1,42 @@
-#include "vutils.h"
-
+#include "VUtils.h"
+#include <intrin.h>
+#include "Memory.h"
 
 
 
 
 namespace VUtils
 {
-	Command GetCommand(GuestVirtureAddress command_ptr)
+	Command GetCommand(GVA command_ptr)
 	{
-		u64 guest_dirbase;
+		UINT64 guest_dirbase;
 		__vmx_vmread(VMCS_GUEST_CR3, &guest_dirbase);
 
-		// 页框号(pml4_pfn) << 12 = 实际物理地址
 		guest_dirbase = cr3{ guest_dirbase }.pml4_pfn << 12;
 
-		const auto command_page = HV::MapGuestVirt(guest_dirbase, command_ptr);
+		const auto command_page = GvaToHva(guest_dirbase, command_ptr,MAP_MEMTORY_INDEX::P1);
 
 		return *reinterpret_cast<Command*>(command_page);
 	}
 
-	void SetCommand(GuestVirtureAddress command_ptr, Command& command_data)
+	void SetCommand(GVA command_ptr, Command& command_data)
 	{
-		u64 guest_dirbase;
+		UINT64 guest_dirbase;
 		__vmx_vmread(VMCS_GUEST_CR3, &guest_dirbase);
 
-		// 页框号(pml4_pfn) << 12 = 实际物理地址
 		guest_dirbase = cr3{ guest_dirbase }.pml4_pfn << 12;
 
-		const auto command_page = HV::MapGuestVirt(guest_dirbase, command_ptr);
+		const auto command_page = GvaToHva(guest_dirbase, command_ptr, MAP_MEMTORY_INDEX::P1);
 
 		*reinterpret_cast<Command*>(command_page) = command_data;
 	}
+
+
+	UINT32 GetCurrentCpuIndex()
+	{
+		cpuid_eax_01 cpuid_value;
+		__cpuid((int*)&cpuid_value, 1);
+		return cpuid_value.cpuid_additional_information.initial_apic_id;
+	}
+
 }

@@ -1,6 +1,8 @@
-#include "vutils.h"
-#include "hv.h"
-#include "ept.h"
+#include <intrin.h>
+#include "ShareData.h"
+#include "Memory.h"
+#include "VUtils.h"
+#include "Debug.h"
 
 HvContext g_HvContext = {0};
 
@@ -24,45 +26,73 @@ void vmexit_handler(PVmContext context, void* unknown)
 	{
 		if (guest_registers->rcx == VMEXIT_KEY)
 		{
-			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::check_is_load)
+			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::CHECK_LOAD)
 			{
 				guest_registers->rax = VMEXIT_KEY;
 			}
 
-			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::init_page_tables)
+			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::INIT_PAGE_TABLE)
 			{
-				guest_registers->rax = (u64)HV::InitPageTable();
+				DBG::SerialPortInitialize(PORT_NUM, 9600);
+				auto res = InitPageTable();
+				guest_registers->rax = (UINT64)(res?VMX_ROOT_RESULT::SUCCESS : VMX_ROOT_RESULT::INIT_ERROR);
 			}
 
-			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::get_dirbase)
+			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::CURRENT_DIRBASE)
 			{
-				Command command_data = VUtils::GetCommand(guest_registers->r8);
-
-				u64 guest_dirbase;
-				__vmx_vmread(VMCS_GUEST_CR3, &guest_dirbase);
-
-				guest_dirbase = cr3{ guest_dirbase }.pml4_pfn << 12;
-				command_data.dirbase = guest_dirbase;
-				guest_registers->rax = (u64)VMX_ROOT_RESULT::success;
-
-				VUtils::SetCommand(guest_registers->r8, command_data);
-			}
-
-			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::translate_virture_address)
-			{
-				auto command_data = VUtils::GetCommand(guest_registers->r8);
-
-				u64 guest_dirbase;
+				Command cmd = VUtils::GetCommand(guest_registers->r8);
+				UINT64 guest_dirbase;
 				__vmx_vmread(VMCS_GUEST_CR3, &guest_dirbase);
 				guest_dirbase = cr3{ guest_dirbase }.pml4_pfn << 12;
-
-				command_data.translate_virt.phys_addr = HV::TranslateGuestVirtual(guest_dirbase, command_data.translate_virt.virt_src);
-
-				guest_registers->rax = (u64)VMX_ROOT_RESULT::success;
-
-				VUtils::SetCommand(guest_registers->r8, command_data);
+				cmd.DirbaseData.Dirbase = guest_dirbase;
+				guest_registers->rax = (UINT64)VMX_ROOT_RESULT::SUCCESS;
+				VUtils::SetCommand(guest_registers->r8, cmd);
 			}
 
+			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::TRANSLATE_GVA2GPA)
+			{
+				Command cmd = VUtils::GetCommand(guest_registers->r8);
+				GPA gpa = GvaToGpa(cmd.TranslateData.dirbase, cmd.TranslateData.gva, MAP_MEMTORY_INDEX::P1);
+				cmd.TranslateData.gpa = gpa;
+				guest_registers->rax = (UINT64)VMX_ROOT_RESULT::SUCCESS;
+				VUtils::SetCommand(guest_registers->r8, cmd);
+			}
+
+
+			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::READ_GUEST_PHY)
+			{
+				Command cmd = VUtils::GetCommand(guest_registers->r8);
+				ReadGuestPhy(cmd.CopyData.DestDirbase, cmd.CopyData.SrcGpa, cmd.CopyData.DestGva, cmd.CopyData.Size);
+				guest_registers->rax = (UINT64)VMX_ROOT_RESULT::SUCCESS;
+				VUtils::SetCommand(guest_registers->r8, cmd);
+			}
+
+			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::WRITE_GUEST_PHY)
+			{
+				Command cmd = VUtils::GetCommand(guest_registers->r8);
+				WriteGuestPhy(cmd.CopyData.SrcDirbase, cmd.CopyData.DestGpa, cmd.CopyData.SrcGva, cmd.CopyData.Size);
+				guest_registers->rax = (UINT64)VMX_ROOT_RESULT::SUCCESS;
+				VUtils::SetCommand(guest_registers->r8, cmd);
+			}
+
+			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::COPY_GUEST_VIR)
+			{
+				Command cmd = VUtils::GetCommand(guest_registers->r8);
+				CopyGuestVirt(cmd.CopyData.SrcDirbase, cmd.CopyData.SrcGva, cmd.CopyData.DestDirbase, cmd.CopyData.DestGva, cmd.CopyData.Size);
+				guest_registers->rax = (UINT64)VMX_ROOT_RESULT::SUCCESS;
+				VUtils::SetCommand(guest_registers->r8, cmd);
+			}
+
+
+			size_t rip, exec_len;
+			__vmx_vmread(VMCS_GUEST_RIP, &rip);
+			__vmx_vmread(VMCS_VMEXIT_INSTRUCTION_LENGTH, &exec_len);
+			__vmx_vmwrite(VMCS_GUEST_RIP, rip + exec_len);
+			return;
+		}
+
+		/*if (guest_registers->rcx == VMEXIT_KEY)
+		{ 
 			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::read_guest_phys)
 			{
 				auto command_data = VUtils::GetCommand(guest_registers->r8);
@@ -98,6 +128,7 @@ void vmexit_handler(PVmContext context, void* unknown)
 			}
 
 			// ept
+			/*
 			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::add_shadow_page)
 			{
 				auto command_data = VUtils::GetCommand(guest_registers->r8);
@@ -218,6 +249,7 @@ void vmexit_handler(PVmContext context, void* unknown)
 				disablePageProtection(eptp, uPagePhyAddr);
 				guest_registers->rax = (u64)VMX_ROOT_RESULT::success;
 			}
+			#1#
 
 
 
@@ -227,47 +259,14 @@ void vmexit_handler(PVmContext context, void* unknown)
 			__vmx_vmread(VMCS_VMEXIT_INSTRUCTION_LENGTH, &exec_len);
 			__vmx_vmwrite(VMCS_GUEST_RIP, rip + exec_len);
 			return;
-		}
+		}*/
 	}
 
 
 	if (vmexit_reason == VMX_EXIT_REASON_EPT_VIOLATION)
 	{
-		EptViolationQualification exit_qualification;
-		__vmx_vmread(VMCS_EXIT_QUALIFICATION, (size_t*)&exit_qualification);
-		u64 fault_pa = 0, fault_va = 0;
-		__vmx_vmread(VMCS_GUEST_PHYSICAL_ADDRESS, (size_t*)&fault_pa);
-		if (exit_qualification.fields.valid_guest_linear_address)
-		{
-			__vmx_vmread(VMCS_EXIT_GUEST_LINEAR_ADDRESS, (size_t*)&fault_va);
-		}
-		else
-		{
-			fault_va = 0;
-		}
-
-		if (exit_qualification.fields.ept_readable || exit_qualification.fields.ept_writeable || exit_qualification.fields.ept_executable)
-		{
-			ept_pointer eptp;
-
-			__vmx_vmread(VMCS_CTRL_EPT_POINTER, (size_t*)&eptp);
-			// EPT entry is present. Permission violation.
-			if (exit_qualification.fields.caused_by_translation)
-			{
-				bool isHandled = VoyagerHandleEptViolation(&exit_qualification, (void*)fault_va);//replace
-				if (isHandled)
-				{
-					UtilInveptGlobal(eptp);
-					return;
-				}
-			}
-
-		}
+		
 	}
 
-
-	// call original vmexit handler...
-	// reinterpret_cast<vmexit_handler_t>( reinterpret_cast<u64>(&vmexit_handler) - g_HvContext.vmexit_handler_rva)(context, unknown);
-
-	((vmexit_handler_t)((u64)(&vmexit_handler) - g_HvContext.vmexit_handler_rva))(context, unknown);
+	((vmexit_handler_t)((UINT64)(&vmexit_handler) - g_HvContext.VmExitHandlerRva))(context, unknown);
 }

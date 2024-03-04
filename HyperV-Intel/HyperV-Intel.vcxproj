@@ -58,18 +58,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ept.cpp" />
-    <ClCompile Include="hv.cpp" />
+    <ClCompile Include="Debug.cpp" />
+    <ClCompile Include="Memory.cpp" />
     <ClCompile Include="vmexit_handle.cpp" />
-    <ClCompile Include="vutils.cpp" />
+    <ClCompile Include="VUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="asm.h" />
-    <ClInclude Include="ept.h" />
+    <ClInclude Include="Debug.h" />
+    <ClInclude Include="Defs.h" />
     <ClInclude Include="ia32.hpp" />
-    <ClInclude Include="hv.h" />
-    <ClInclude Include="types.h" />
-    <ClInclude Include="vutils.h" />
+    <ClInclude Include="Memory.h" />
+    <ClInclude Include="ShareData.h" />
+    <ClInclude Include="VUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="Asm.asm">

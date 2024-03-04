@@ -115,7 +115,7 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 		a9, a10, a11, a12, a13, a14, a15, a16, a17);
 
 
- 
+
 	if (!StrCmp(ModuleName, L"ntoskrnl.exe") && !HookNtOsKernel)
 	{
 		HookNtOsKernel = TRUE; 
