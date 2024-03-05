@@ -100,6 +100,8 @@ enum class VMX_COMMAND
     READ_GUEST_PHY,
     WRITE_GUEST_PHY,
     COPY_GUEST_VIR,
+
+    ADD_SHADOW_PAGE,
 };
 
 
@@ -128,6 +130,12 @@ typedef union Command
         GVA DestGva;
         UINT32 Size;
 	}CopyData;
+
+
+	struct 
+	{
+        GPA gpa;
+	}ShadowPage;
 
 };
 
@@ -164,3 +172,22 @@ using vmexit_handler_t = void(__fastcall*)(PVmContext* context, void* unknown);
 #else
 using vmexit_handler_t = void(__fastcall*)(PVmContext context, void* unknown);
 #endif
+
+
+enum class InvEptType : ULONG_PTR {
+    kSingleContextInvalidation = 1,
+    kGlobalInvalidation = 2,
+};
+
+
+struct InvEptDescriptor {
+    ULONG64 ept_pointer;
+    ULONG64 reserved1;
+};
+
+
+struct ShadowPt
+{
+    ept_pde old_pde;
+    ept_pte shadow_pte[512];
+};

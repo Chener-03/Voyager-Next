@@ -15,7 +15,9 @@ enum MAP_MEMTORY_INDEX
 #pragma section(".pdpt", read, write)
 #pragma section(".pd", read, write)
 #pragma section(".pt", read, write)
+#pragma section(".sdpt", read, write)
 
+extern ShadowPt g_shadow_pt[10];
 
 
 UINT64 GetMapVirtual(UINT16 offset, MAP_MEMTORY_INDEX index);
@@ -40,6 +42,6 @@ BOOL InitPageTable();
 
 BOOL ReadGuestPhy(__IN__ UINT64 Dirbase, __IN__ GPA ReadPhyAddr, __OUT__ GVA WriteVirAddr, __IN__ UINT32 Size);
 
-BOOL WriteGuestPhy(UINT64 Dirbase, GPA WritePhyAddr, GVA DataPhyAddr, UINT32 Size);
+BOOL WriteGuestPhy(UINT64 Dirbase, GPA WritePhyAddr, GVA DataVirAddr, UINT32 Size);
 
 BOOL CopyGuestVirt(UINT64 SrcDirbase, GVA SrcVa, UINT64 DestDirbase, GVA DestVa, UINT32 Size);

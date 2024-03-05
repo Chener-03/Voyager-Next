@@ -7,122 +7,176 @@
 
 
 #define VMEXIT_KEY 0x20240101ABCD
-// #define VMEXIT_KEY 0xDEADBEEFDEADBEEF
 
-using u8 = unsigned char;
-using u16 = unsigned short;
-using u32 = unsigned int;
-using u64 = unsigned long long;
-using u128 = __m128;
+#define SELF_REF_PML4_IDX 510
+#define MAPPING_PML4_IDX 100
+
+#define MAPPING_ADDRESS_BASE 0x0000327FFFE00000
+#define SELF_REF_PML4 0xFFFFFF7FBFDFE000
+
+constexpr auto PAGE_4KB = (0x1000);
+constexpr auto PAGE_2MB = (0x1000 * 512);
+constexpr auto PAGE_1GB = (0x1000 * 512 * 512);
+
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef min
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
+#endif
+
+#define __OUT__ 
+#define  __IN__
+
+using UINT8 = unsigned char;
+using UINT16 = unsigned short;
+using UINT32 = unsigned int;
+using UINT64 = unsigned long long;
+using UINT128 = __m128;
 
 
-using GuestVirtureAddress = u64;
-using GuestPhysicalAddress = u64;
-using HostVirtureAddress = u64;
-using HostPhysicalAddress = u64;
+using ULONG64 = UINT64;
+using ULONG_PTR = UINT64;
+using NTSTATUS = long;
+using BOOL = int;
+using PVOID = void*;
+
+#define TRUE				1
+#define FALSE				0
+
+
+
+
+using GVA = UINT64;
+using GPA = UINT64;
+using HVA = UINT64;
+using HPA = UINT64;
+
+
+
+typedef union _Address
+{
+	UINT64 value;
+
+	struct
+	{
+		UINT64 offset_4kb : 12;
+		UINT64 pt_index : 9;
+		UINT64 pd_index : 9;
+		UINT64 pdpt_index : 9;
+		UINT64 pml4_index : 9;
+		UINT64 reserved : 16;
+	}Type4KB;
+
+	struct
+	{
+		UINT64 offset_2mb : 21;
+		UINT64 pd_index : 9;
+		UINT64 pdpt_index : 9;
+		UINT64 pml4_index : 9;
+		UINT64 reserved : 16;
+	}Type2MB;
+
+	struct
+	{
+		UINT64 offset_1gb : 30;
+		UINT64 pdpt_index : 9;
+		UINT64 pml4_index : 9;
+		UINT64 reserved : 16;
+	}Type1GB;
+
+} Address, * PAddress;
+
+
+enum class VMX_ROOT_RESULT
+{
+	SUCCESS,
+	INIT_ERROR
+};
 
 enum class VMX_COMMAND
 {
-	init_page_tables,
-	read_guest_phys,
-	write_guest_phys,
-	copy_guest_virt,
-	get_dirbase,
-	translate_virture_address,
-	check_is_load,
+	CHECK_LOAD,
+	INIT_PAGE_TABLE,
+	CURRENT_DIRBASE,
+	TRANSLATE_GVA2GPA,
+	READ_GUEST_PHY,
+	WRITE_GUEST_PHY,
+	COPY_GUEST_VIR,
 
-	// ept
-	add_shadow_page,
-	add_shadow_page_phys,
-	delete_shadow_page,
-	unhide_shadow_page,
-	disable_page_protection,
-	DiablePCID,
-	testSetSB2M,
-	test3
+	ADD_SHADOW_PAGE,
 };
 
-typedef union _Command
+
+typedef union Command
 {
-	struct _copy_phys
+	struct
 	{
-		HostPhysicalAddress  phys_addr;
-		GuestVirtureAddress buffer;
-		u64 size;
-	} copy_phys;
+		UINT64 dirbase;
+		GPA gpa;
+		GVA gva;
+	} TranslateData;
 
-	struct _copy_virt
+	struct
 	{
-		GuestPhysicalAddress dirbase_src;
-		GuestVirtureAddress virt_src;
-		GuestPhysicalAddress dirbase_dest;
-		GuestVirtureAddress virt_dest;
-		u64 size;
-	} copy_virt;
+		UINT64 Dirbase;
+	}DirbaseData;
 
 
-	//translate
-	struct _translate_virt
+	struct
 	{
-		GuestVirtureAddress virt_src;
-		GuestPhysicalAddress phys_addr;
-	} translate_virt;
+		UINT64 SrcDirbase;
+		UINT64 DestDirbase;
+		GPA SrcGpa;
+		GVA SrcGva;
+		GPA DestGpa;
+		GVA DestGva;
+		UINT32 Size;
+	}CopyData;
 
 
-	//get_dirbase
-	GuestPhysicalAddress dirbase;
-
-
-	//ept start {
-	struct _addShadowPage
+	struct
 	{
-		GuestVirtureAddress uVirtualAddrToHook;
-		GuestVirtureAddress uPageRead;
-		GuestVirtureAddress uPageExecute;
-	}addShadowPage;
+		GPA gpa;
+	}ShadowPage;
 
-	struct _addShadowPagePhys
-	{
-		GuestVirtureAddress uVirtualAddrToHook;
-		GuestPhysicalAddress uPageRead;
-		GuestPhysicalAddress uPageExecute;
-
-	}addShadowPagePhys;
-
-	struct _deleteShaowPage
-	{
-		GuestVirtureAddress uVirtualAddrToHook;
-	}deleteShaowPage;
-
-	struct _unHideShaowPage
-	{
-		GuestVirtureAddress uVirtualAddrToHook;
-	}unHideShaowPage;
-
-	struct _disablePageProtection
-	{
-		GuestPhysicalAddress phys_addr;
-	}disablePageProtection;
-	// } ept end
+};
 
 
-	struct _test_reg
-	{
-		u64 a1;
-		u64 a2;
-		u64 a3;
-		u64 a4;
-		u64 a5;
-		u64 a6;
-		u64 a7;
-	}test_region;
 
-} Command, * PCommand;
+typedef struct _VmContext
+{
+	UINT64 rax;
+	UINT64 rcx;
+	UINT64 rdx;
+	UINT64 rbx;
+	UINT64 rsp;
+	UINT64 rbp;
+	UINT64 rsi;
+	UINT64 rdi;
+	UINT64 r8;
+	UINT64 r9;
+	UINT64 r10;
+	UINT64 r11;
+	UINT64 r12;
+	UINT64 r13;
+	UINT64 r14;
+	UINT64 r15;
+	UINT128 xmm0;
+	UINT128 xmm1;
+	UINT128 xmm2;
+	UINT128 xmm3;
+	UINT128 xmm4;
+	UINT128 xmm5;
+} VmContext, * PVmContext;
+
+
 
 
 extern "C" unsigned long long HyperVCall(unsigned long long key, VMX_COMMAND cmd, void* data);
 
-u64 InitAllCore()
+UINT64 InitAllCore()
 {
 	GROUP_AFFINITY orig_group_affinity;
 	GetThreadGroupAffinity(GetCurrentThread(), &orig_group_affinity);
@@ -138,7 +192,7 @@ u64 InitAllCore()
 			group_affinity.Group = group_number;
 			SetThreadGroupAffinity(GetCurrentThread(), &group_affinity, NULL);
 
-			auto result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::init_page_tables, nullptr);;
+			auto result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::INIT_PAGE_TABLE, nullptr);
 			if (result != 0)
 				return result;
 		}
@@ -159,17 +213,12 @@ int FuckTestFunction(int a, int b)
 	return a * b;
 }
 
-enum class MapType
-{
-	map_src = 0,
-	map_dest = 0
-	// map_dest = 1
-};
+int a = 1;
+
 
 int main()
 {
-
-	u64 Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::check_is_load, 0);
+	UINT64 Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::CHECK_LOAD, 0);
 	if (Result == VMEXIT_KEY)
 	{
 		printf("[+] hyper-v hook is loading... \n");
@@ -181,7 +230,6 @@ int main()
 	}
 	system("pause");
 
-	printf("count is %lld \n\n", HyperVCall(VMEXIT_KEY, VMX_COMMAND::DiablePCID, 0));
 
 	// 测试init
 	Result = InitAllCore();
@@ -197,17 +245,17 @@ int main()
 	system("pause");
 	 
 	
-	Command cmd;
+	Command cmd ;
+	UINT64 test_int = 20240101;
+	UINT64 CurrentDirBase = 0;
 
-	unsigned long long test_int = 20240225;
 	//测试 获取 dirbase
-	cmd.dirbase = 0;
-	u64 dirbase = 0;
-	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::get_dirbase, &cmd);
-	if (Result == 0 && cmd.dirbase != 0)
+	cmd.DirbaseData.Dirbase = 0;
+	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::CURRENT_DIRBASE, &cmd);
+	if (Result == 0 && cmd.DirbaseData.Dirbase != 0)
 	{
-		dirbase = cmd.dirbase;
-		printf("[+] hyper-v get dirbase success, current proc disbase is %llx \n", dirbase);
+		CurrentDirBase = cmd.DirbaseData.Dirbase;
+		printf("[+] hyper-v get dirbase success, current proc disbase is %llx \n", CurrentDirBase);
 	}
 	else
 	{
@@ -219,16 +267,16 @@ int main()
 
 
 	//测试 复制虚拟空间
-	cmd.copy_virt.dirbase_src = dirbase;
-	cmd.copy_virt.dirbase_dest = dirbase;
-	cmd.copy_virt.virt_src = (GuestVirtureAddress)&test_int;
-	unsigned long long test_copy_dest = 0;
-	cmd.copy_virt.virt_dest = (GuestVirtureAddress)&test_copy_dest;
-	cmd.copy_virt.size = sizeof(unsigned long long);
-	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::copy_guest_virt, &cmd);
-	if (Result == 0 && test_copy_dest == test_int)
+	UINT64 test_copy_vir = 0;
+	cmd.CopyData.SrcDirbase = CurrentDirBase;
+	cmd.CopyData.DestDirbase = CurrentDirBase;
+	cmd.CopyData.SrcGva = (UINT64) & test_int;
+	cmd.CopyData.DestGva = (UINT64) &test_copy_vir;
+	cmd.CopyData.Size = sizeof(UINT64);
+	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::COPY_GUEST_VIR, &cmd);
+	if (Result == 0 && test_copy_vir == test_int)
 	{
-		printf("[+] hyper-v copy guest virt success, copy data is %lld \n", test_copy_dest);
+		printf("[+] hyper-v copy guest virt success, copy data is %lld \n", test_copy_vir);
 	}
 	else
 	{
@@ -240,13 +288,14 @@ int main()
 
 
 	// 测试翻译物理地址
-	cmd.translate_virt.virt_src = (GuestVirtureAddress)&test_int;
-	cmd.translate_virt.phys_addr = 0;
-	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::translate_virture_address, &cmd);
-	GuestPhysicalAddress test_int_phy_addr = 0;
-	if (Result == 0 && cmd.translate_virt.phys_addr != 0)
+	cmd.TranslateData.dirbase = CurrentDirBase;
+	cmd.TranslateData.gva = (UINT64)&test_int;
+	cmd.TranslateData.gpa = 0;
+	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::TRANSLATE_GVA2GPA, &cmd);
+	GPA test_int_phy_addr = 0;
+	if (Result == 0 && cmd.TranslateData.gpa != 0)
 	{
-		test_int_phy_addr = cmd.translate_virt.phys_addr;
+		test_int_phy_addr = cmd.TranslateData.gpa;
 		printf("[+] hyper-v translate_virt success, test_int phy addr is %llx \n", test_int_phy_addr);
 	}
 	else
@@ -260,11 +309,12 @@ int main()
 
 
 	// 测试读取物理地址
-	u64 test_read_phy_addr = 0;
-	cmd.copy_phys.phys_addr = test_int_phy_addr;
-	cmd.copy_phys.buffer = (GuestVirtureAddress)&test_read_phy_addr;
-	cmd.copy_phys.size = sizeof(unsigned long long);
-	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::read_guest_phys, &cmd);
+	UINT64 test_read_phy_addr = 0;
+	cmd.CopyData.DestDirbase = CurrentDirBase;
+	cmd.CopyData.DestGva = (UINT64)&test_read_phy_addr;
+	cmd.CopyData.SrcGpa = test_int_phy_addr;
+	cmd.CopyData.Size = sizeof(UINT64); 
+	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::READ_GUEST_PHY, &cmd);
 	if (Result == 0 && test_read_phy_addr == test_int)
 	{
 		printf("[+] hyper-v read_guest_phys success, read data is %lld \n", test_read_phy_addr);
@@ -280,12 +330,14 @@ int main()
 
 	// 测试写物理地址
 	unsigned long long test_write_phy_int = 2024666666;
-	cmd.copy_phys.phys_addr = test_int_phy_addr;
-	cmd.copy_phys.buffer = (GuestVirtureAddress)&test_write_phy_int;
-	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::write_guest_phys, &cmd);
+	cmd.CopyData.SrcDirbase = CurrentDirBase;
+	cmd.CopyData.SrcGva = (UINT64)&test_write_phy_int;
+	cmd.CopyData.DestGpa = test_int_phy_addr;
+	cmd.CopyData.Size = sizeof(UINT64);
+	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::WRITE_GUEST_PHY, &cmd);
 	if (Result == 0 && test_int == test_write_phy_int)
 	{
-		printf("[+] hyper-v write_guest_phys success, read data is %lld \n", test_int);
+		printf("[+] hyper-v write_guest_phys success, write data is %lld \n", test_int);
 	}
 	else
 	{
@@ -294,7 +346,7 @@ int main()
 	}
 	system("pause");
 
-
+	 
 
 	
 	// hook测试函数
@@ -315,63 +367,38 @@ int main()
 	UINT32 delta = (UINT64)&FuckTestFunction - (UINT64)&TestFunction - 5;
 	printf("delta is %x \n", delta);
 
-	char hookpage[0x1000] = { 0 };
-	memcpy(hookpage, (void*)ALIGN_TO_4KB_DOWN((u64)& TestFunction), 0x1000);
-	u64 jmpaddr = (u64)&hookpage[0] + ((u64)&TestFunction - ALIGN_TO_4KB_DOWN((u64)&TestFunction)) + 1;
-	*(u32*)jmpaddr = delta;
+	void* fuckpage4k = malloc(0x1000);
 
+	/**
+	 *	hook step： (前提 2m分割为4k) 
+	 *	1. 获取到 TestFunction 的 pa
+	 *	2. pa位移到页面首地址
+	 *	3. 从物理页面拷贝4kb 到fuckpage
+	 *	4. 把fuckpage 的第二步偏移+1 处4字节地址改成 delta   （vs debug app 每个函数前面会嵌套一个jmp  方便测试hook，release的话需要构建跳转字节） 
+	 *	5. 把 pt 的pfn 指向这个物理页面首地址 改为只执行属性
+	 *	6. 触发违规后  如果是这个地址  则给他循环恢复为  读写/执行
+	 */
 
+	cmd.TranslateData.gva = (UINT64)&TestFunction;
+	cmd.TranslateData.dirbase = CurrentDirBase;
+	HyperVCall(VMEXIT_KEY, VMX_COMMAND::TRANSLATE_GVA2GPA, &cmd);
+	GPA testFunGpa = cmd.TranslateData.gpa;
+	printf("TestFun GPA is %llx \n", testFunGpa);
+	printf("TestFun GVA is %llx \n", cmd.TranslateData.gva);
 
+	GPA testFunPageAddr = (testFunGpa >> 12) << 12;
+	printf("TestFun Page GPA is %llx \n", testFunPageAddr);
+	UINT32 offset = testFunGpa - testFunPageAddr;
+	printf("TestFun Addr Page offset is %d \n", offset);
 
-	// MEMORY_BASIC_INFORMATION memInfo;
-	// VirtualQuery(&TestFunction, &memInfo, sizeof(memInfo));
-	//
-	// printf("protect  %d\n", memInfo.Protect);
-	// printf("base addr  %llx\n", memInfo.BaseAddress);
-	//
-	//
-	// cmd = { 0 };
-	// cmd.translate_virt.virt_src = (GuestVirtureAddress)&TestFunction;
-	// cmd.translate_virt.phys_addr = 0;
-	// system("pause");
-	// Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::translate_virture_address, &cmd);
-	//
-	// printf("this addr va is %llx\n", (void*)&test_int);
-	// printf("hook fun va is %llx\n", (void*)&TestFunction);
-	// printf("hook fun phy addr1 is %llx\n", cmd.translate_virt.phys_addr);
-	// cmd = { 0 };
-	// cmd.test_region.a1 = (u64)(&TestFunction);
-	// system("pause");
+ 
+	
 
-
-	cmd.test_region.a1 = (u64)&TestFunction;
-	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::test3, &cmd);
-	// printf("HyperVCall ret %llx\n", Result);
-	// printf("hook fun phy addr2 is %llx\n", cmd.test_region.a2);
-	// printf("result a3 is %llx\n", cmd.test_region.a3);
-	// printf("result a4 is %llx\n", cmd.test_region.a4);
-	// printf("result a5 is %llx\n", cmd.test_region.a5);
-	// printf("result a6 is %llx\n", cmd.test_region.a6);
-	// printf("result a7 is %llx\n", cmd.test_region.a7);
-
-
-	// printf("next will write \n");
-	// system("pause");
-	// *((unsigned char*)aa2) = 12;
-
-	cmd.addShadowPage.uVirtualAddrToHook = (u64)(&TestFunction);
-	cmd.addShadowPage.uPageExecute = (u64)(&TestFunction);
-	char a[0x1000] = { 0 };
-	cmd.addShadowPage.uPageRead = (u64)(&a[0]);
-	Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::add_shadow_page, &cmd);
-	printf("TestFunction(2,4) is %d \n", TestFunction(2, 4));
-	printf("TestFunction 字节码: \n");
-	for (int i = 0; i < 10; ++i)
-	{
-		unsigned char bt = ((unsigned char*)&TestFunction)[i];
-		printf("%02x ", bt);
-	}
-	printf("\n");
+	/*cmd.TranslateData.gva = (UINT64)&TestFunction;
+	cmd.TranslateData.dirbase = CurrentDirBase;
+	HyperVCall(VMEXIT_KEY, VMX_COMMAND::TRANSLATE_GVA2GPA, &cmd);
+	cmd.ShadowPage.gpa = cmd.TranslateData.gpa;
+	HyperVCall(VMEXIT_KEY, VMX_COMMAND::ADD_SHADOW_PAGE, &cmd);*/
 
 	endp:
 	system("pause");

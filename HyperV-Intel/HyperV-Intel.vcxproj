@@ -59,6 +59,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Debug.cpp" />
+    <ClCompile Include="Ept.cpp" />
     <ClCompile Include="Memory.cpp" />
     <ClCompile Include="vmexit_handle.cpp" />
     <ClCompile Include="VUtils.cpp" />
@@ -67,6 +68,7 @@
     <ClInclude Include="asm.h" />
     <ClInclude Include="Debug.h" />
     <ClInclude Include="Defs.h" />
+    <ClInclude Include="Ept.h" />
     <ClInclude Include="ia32.hpp" />
     <ClInclude Include="Memory.h" />
     <ClInclude Include="ShareData.h" />

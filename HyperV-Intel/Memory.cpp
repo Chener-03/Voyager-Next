@@ -1,14 +1,14 @@
 #include "Memory.h"
-
 #include <intrin.h>
-
 #include "VUtils.h"
+#include "Debug.h"
 
 pml4e* g_HvSelfRefPml4 = (pml4e*)SELF_REF_PML4;
 
 __declspec(allocate(".pdpt")) pdpte g_pdpt[512];
 __declspec(allocate(".pd")) pde g_pd[512];
 __declspec(allocate(".pt")) pte g_pt[512];
+__declspec(allocate(".sdpt")) ShadowPt g_shadow_pt[10];
 
 
 UINT64 GetMapVirtual(UINT16 offset, MAP_MEMTORY_INDEX index)
@@ -38,7 +38,7 @@ HVA HpaToHva(HPA HostPhyAddr, MAP_MEMTORY_INDEX index)
 HPA HvaToHpa(HVA HostVirtureAddress)
 {
 	Address virtAddr = { HostVirtureAddress };
-	Address cursor = { g_HvSelfRefPml4->flags };
+	Address cursor = { (UINT64)g_HvSelfRefPml4 }; 
 
 	pml4e pml4eEntry = ((pml4e*)cursor.value)[virtAddr.Type4KB.pml4_index];
 
@@ -186,12 +186,18 @@ HVA GvaToHva(UINT64 Dirbase, GVA GuestVirAddr, MAP_MEMTORY_INDEX index)
 BOOL InitPageTable()
 {
 	HPA pdpt_phys = HvaToHpa((HVA)g_pdpt);
+	DBG::Print("InitPageTable: pdpt_phys is %llx \n", pdpt_phys);
 
 	HPA pd_phys = HvaToHpa((HVA)g_pd);
+	DBG::Print("InitPageTable: pd_phys is %llx \n", pd_phys);
 
 	HPA pt_phys = HvaToHpa((HVA)g_pt);
+	DBG::Print("InitPageTable: pt_phys is %llx \n", pt_phys);
 
-	if (!pdpt_phys || !pd_phys || !pt_phys)
+	HPA shadow_pt = HvaToHpa((HVA)&g_shadow_pt[0]);
+	DBG::Print("InitPageTable: shadow_pt is %llx \n", shadow_pt);
+
+	if (!pdpt_phys || !pd_phys || !pt_phys || !shadow_pt)
 		return FALSE;
 
 	// …Ë÷√”≥…‰“≥±ÌœÓ°£°£°£
