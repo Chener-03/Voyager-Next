@@ -105,7 +105,7 @@ enum class VMX_COMMAND
 	WRITE_GUEST_PHY,
 	COPY_GUEST_VIR,
 
-	ADD_SHADOW_PAGE,
+	COVER_PAGE_2M_TO_4K,
 };
 
 
@@ -368,6 +368,7 @@ int main()
 	printf("delta is %x \n", delta);
 
 	void* fuckpage4k = malloc(0x1000);
+	memset(fuckpage4k, 0, 0x1000);
 
 	/**
 	 *	hook step： (前提 2m分割为4k) 
@@ -386,19 +387,23 @@ int main()
 	printf("TestFun GPA is %llx \n", testFunGpa);
 	printf("TestFun GVA is %llx \n", cmd.TranslateData.gva);
 
+	cmd.ShadowPage.gpa = testFunGpa;
+	HyperVCall(VMEXIT_KEY, VMX_COMMAND::COVER_PAGE_2M_TO_4K, &cmd);
+	printf("Cover TestFun To 4kb Page\n");
+
+
 	GPA testFunPageAddr = (testFunGpa >> 12) << 12;
 	printf("TestFun Page GPA is %llx \n", testFunPageAddr);
 	UINT32 offset = testFunGpa - testFunPageAddr;
 	printf("TestFun Addr Page offset is %d \n", offset);
 
- 
-	
+	cmd.CopyData.SrcGpa = testFunPageAddr;
+	cmd.CopyData.DestDirbase = CurrentDirBase;
+	cmd.CopyData.DestGva = (GVA)fuckpage4k;
+	cmd.CopyData.Size = 0x1000;
+	HyperVCall(VMEXIT_KEY, VMX_COMMAND::READ_GUEST_PHY, &cmd);
 
-	/*cmd.TranslateData.gva = (UINT64)&TestFunction;
-	cmd.TranslateData.dirbase = CurrentDirBase;
-	HyperVCall(VMEXIT_KEY, VMX_COMMAND::TRANSLATE_GVA2GPA, &cmd);
-	cmd.ShadowPage.gpa = cmd.TranslateData.gpa;
-	HyperVCall(VMEXIT_KEY, VMX_COMMAND::ADD_SHADOW_PAGE, &cmd);*/
+
 
 	endp:
 	system("pause");

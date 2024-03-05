@@ -101,7 +101,7 @@ enum class VMX_COMMAND
     WRITE_GUEST_PHY,
     COPY_GUEST_VIR,
 
-    ADD_SHADOW_PAGE,
+    COVER_PAGE_2M_TO_4K,
 };
 
 

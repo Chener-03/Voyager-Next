@@ -86,10 +86,9 @@ void vmexit_handler(PVmContext context, void* unknown)
 				VUtils::SetCommand(guest_registers->r8, cmd);
 			}
 
-			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::ADD_SHADOW_PAGE)
+			if ((VMX_COMMAND)guest_registers->rdx == VMX_COMMAND::COVER_PAGE_2M_TO_4K)
 			{
 				Command cmd = VUtils::GetCommand(guest_registers->r8);
-				
 
 				ept_pointer eptp;
 				__vmx_vmread(VMCS_CTRL_EPT_POINTER, (size_t*)&eptp);
@@ -97,11 +96,6 @@ void vmexit_handler(PVmContext context, void* unknown)
 				if (!Is4kPage(eptp, cmd.ShadowPage.gpa))
 				{
 					Set2mbTo4kb(eptp, cmd.ShadowPage.gpa);
-				}
-
-				if (Is4kPage(eptp, cmd.ShadowPage.gpa))
-				{
-					
 				}
 
 				guest_registers->rax = (UINT64)VMX_ROOT_RESULT::SUCCESS;
