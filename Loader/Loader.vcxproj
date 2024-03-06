@@ -81,6 +81,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BootImage.h" />
+    <ClInclude Include="Cxxopts.hpp" />
     <ClInclude Include="Defs.h" />
     <ClInclude Include="Pch.h" />
     <ClInclude Include="ShareData.h" />

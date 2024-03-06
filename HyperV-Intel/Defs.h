@@ -101,7 +101,9 @@ enum class VMX_COMMAND
     WRITE_GUEST_PHY,
     COPY_GUEST_VIR,
 
+    
     COVER_PAGE_2M_TO_4K,
+    REPLACE_4K_PAGE,
 };
 
 
@@ -134,7 +136,10 @@ typedef union Command
 
 	struct 
 	{
+        UINT32 index;
         GPA gpa;
+        GVA gva;
+        UINT64 dirbase;
 	}ShadowPage;
 
 };
@@ -188,6 +193,17 @@ struct InvEptDescriptor {
 
 struct ShadowPt
 {
+    bool use;
     ept_pde old_pde;
     ept_pte shadow_pte[512];
 };
+
+struct HookInfo
+{
+    bool use;
+    ept_pte old_pte;
+    UINT64 hook_pt_phy_address; // 触发违规 右移12位一致说明是这个hook
+    UINT64 old_pfn;
+    UINT64 new_pfn;
+};
+

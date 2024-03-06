@@ -7,7 +7,11 @@
 
 UINT8 UtilInveptGlobal(ept_pointer eptPoint);
 
-BOOL Is4kPage(ept_pointer eptp, HPA hpa);
+BOOL Is4kPage(ept_pointer eptp, GPA gpa);
 
-void Set2mbTo4kb(ept_pointer eptp, HPA hpa);
+void Set2mbTo4kb(ept_pointer eptp, GPA gpa, UINT32 saveIndex);
+
+BOOL SetEptPtAttr(ept_pointer eptp, GPA gpa, UINT64 pfn, bool canExec);
+
+ept_pte GetEptPt(ept_pointer eptp, GPA gpa);
 

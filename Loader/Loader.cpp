@@ -4,14 +4,24 @@
 #include "Utils.h"
 #include "BootImage.h"
 #include "ShareData.h"
-
+#include "Cxxopts.hpp"
 
 MapperContext g_MapperContext = { 0 };
 
 
-
-int main()
+ 
+int main(int argc,char** argv)
 {
+    cxxopts::Options options("MyProgram", "One line description of MyProgram");
+    options.add_options()
+        ("s,spoofer", "change smbios")
+        ("d,seed", "seed", cxxopts::value<std::string>()->default_value("0"))
+        ("p,syspath", "syspath", cxxopts::value<std::string>()->default_value(""))
+        ;
+    options.allow_unrecognised_options();
+    auto result = options.parse(argc, argv);
+
+
 #ifndef _DEBUG
     DeleteSelf();
 #endif
@@ -43,7 +53,7 @@ int main()
 
     {
         DisableKvas();
-        // EnableHyperV();
+        EnableHyperV();
         DisableFastboot();
         // DeleteSvc("EventLog");
     }
@@ -59,10 +69,15 @@ int main()
 
 
         g_MapperContext.test = RandomInt(1000,9999);
-        g_MapperContext.RunWithSpoofer = 1;
-        g_MapperContext.RandomSeed = 970521;
+        auto param_spoofer = result["spoofer"].as<bool>();
+        g_MapperContext.RunWithSpoofer = param_spoofer?1:0;
+        auto param_seed = result["seed"].as<std::string>();
+        g_MapperContext.RandomSeed = atoi(param_seed.c_str());
         TextPrint("magic is " + std::to_string(g_MapperContext.test) + "\n", Green);
-
+        if (param_spoofer)
+        {
+            TextPrint("run with spoofer,seed is " + param_seed + "\n", Green);
+        }
 
         std::string bootfwPathA = GetBootfwPath();
         std::wstring bootfwPath = String2Wstring(bootfwPathA);

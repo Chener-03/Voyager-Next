@@ -106,6 +106,7 @@ enum class VMX_COMMAND
 	COPY_GUEST_VIR,
 
 	COVER_PAGE_2M_TO_4K,
+	REPLACE_4K_PAGE,
 };
 
 
@@ -138,7 +139,10 @@ typedef union Command
 
 	struct
 	{
+		UINT32 index;
 		GPA gpa;
+		GVA gva;
+		UINT64 dirbase;
 	}ShadowPage;
 
 };
@@ -203,19 +207,184 @@ UINT64 InitAllCore()
 }
 
 
-int TestFunction(int a,int b)
+class HookFunc
 {
-	return a+b;
+#define jmpSelfCodeLen 12
+#define jmpOldCodeLen 14
+
+public:
+
+	bool Hook(void* funAddr, void* selfFunAddr, UINT32 hookSize, UINT32 hvIndex)
+	{
+		this->old_fun_addr = funAddr;
+		this->new_fun_addr = selfFunAddr;
+		this->hook_size = hookSize;
+		this->hv_index = hvIndex;
+
+		if (hookSize < jmpSelfCodeLen)
+		{
+			return false;
+		}
+
+		if (!fuckPage4k && !MallocFuckPageMemory())
+		{
+			return false;
+		}
+
+		if (!callOldJmpCode)
+		{
+			callOldJmpCode = VirtualAlloc(NULL, hookSize + jmpOldCodeLen + 10, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+			memset(callOldJmpCode, 0x90, hookSize + jmpOldCodeLen + 10);
+		}
+
+		// 获取funAddr的gpa
+		Command cmd = { 0 };
+		cmd.TranslateData.dirbase = GetDirbase();
+		cmd.TranslateData.gva = (GVA)funAddr;
+		HyperVCall(VMEXIT_KEY, VMX_COMMAND::TRANSLATE_GVA2GPA, &cmd);
+		GPA funAddrGpa = cmd.TranslateData.gpa;
+
+
+		// 函数所在ept pd转为4kb的pt
+		cmd.ShadowPage.gpa = funAddrGpa;
+		cmd.ShadowPage.index = hvIndex;
+		HyperVCall(VMEXIT_KEY, VMX_COMMAND::COVER_PAGE_2M_TO_4K, &cmd);
+
+
+
+		// 获取到 funAddrGpa 这一页的首地址 拷贝到 fuckPage4k
+		GPA funPageGpa = (funAddrGpa >> 12) << 12;
+		//页面和函数的偏移
+		UINT32 offset = funAddrGpa - funPageGpa;
+		// copy
+		cmd.CopyData.SrcGpa = funPageGpa;
+		cmd.CopyData.DestDirbase = GetDirbase();
+		cmd.CopyData.DestGva = (GVA)fuckPage4k;
+		cmd.CopyData.Size = 4096;
+		HyperVCall(VMEXIT_KEY, VMX_COMMAND::READ_GUEST_PHY, &cmd);
+
+
+		//构建跳转原函数的内存区域
+		memcpy(callOldJmpCode, funAddr, hookSize);
+		memcpy((void*)((UINT64)callOldJmpCode + hookSize), &jmpOldCode[0], jmpOldCodeLen);
+		UINT64 old_ret_pos = (UINT64)fuckPage4k + offset + hookSize;
+		memcpy((void*)((UINT64)callOldJmpCode + hookSize + 6), &old_ret_pos, 8);
+
+
+
+		/**
+		 *	注意 这里不可以使用读指针并且指针地址位于这个4k页面内
+		 *	比如 movzx   eax, byte ptr [*]  ；[*]位于这个页面内
+		 *		jmp qword ptr [*] ；[*]位于这个页面内
+		 *		使用这种会读的时候执行 执行的时候读 ept违规会无限循环
+		 *	所以用这种方式
+		 *	movabs rax, addr
+		 *  push rax
+		 *	ret
+		 */
+		// 修改要hook的函数头部 跳转到我们的函数
+		UINT64 fuckPageFuncAddr = (UINT64)fuckPage4k + offset;
+		memset((void*)fuckPageFuncAddr, 0x90, hookSize);
+		memcpy((void*)fuckPageFuncAddr, &jmpSelfCode[0], jmpSelfCodeLen);
+		memcpy((void*)(fuckPageFuncAddr + 2), &selfFunAddr, 8);
+
+
+		// 挂载fuckpage到ept
+		cmd.ShadowPage.dirbase = GetDirbase();
+		cmd.ShadowPage.gva = (GVA)fuckPage4k;
+		cmd.ShadowPage.gpa = funAddrGpa;
+		cmd.ShadowPage.index = hvIndex;
+		HyperVCall(VMEXIT_KEY, VMX_COMMAND::REPLACE_4K_PAGE, &cmd);
+
+		return true;
+	}
+
+	void* GetOldPtr()
+	{
+		return callOldJmpCode;
+	}
+
+private:
+
+	void* fuckPage4k = nullptr;	// 完全复制一页 用于ept仅执行
+	UINT64 fuckPage4kGpa = 0;
+
+	UINT64 dirbase = 0;			// 当前dirbase cache 
+	UCHAR jmpSelfCode[13] = "\x48\xB8\x00\x00\x00\x00\x00\x00\x00\x00\x50\xC3";
+	UCHAR jmpOldCode[15] = "\xFF\x25\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF";
+
+
+	void* callOldJmpCode = nullptr;	// 保存原来修改的字节 后面添加上jmp 调用这个地址来调用原函数
+
+	void* old_fun_addr = nullptr;
+	void* new_fun_addr = nullptr;
+	UINT32 hook_size = 0;
+	UINT32 hv_index = 0;
+
+
+private:
+	bool MallocFuckPageMemory()
+	{
+		fuckPage4k = VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+		memset(fuckPage4k, 0, 4096);
+		if (!GetDirbase())
+		{
+			return false;
+		}
+
+		Command cmd = { 0 };
+		cmd.TranslateData.gva = (UINT64)fuckPage4k;
+		cmd.TranslateData.dirbase = GetDirbase();
+		HyperVCall(VMEXIT_KEY, VMX_COMMAND::TRANSLATE_GVA2GPA, &cmd);
+		if ((cmd.TranslateData.gpa & 0xFFF) == 0)
+		{
+			fuckPage4kGpa = cmd.TranslateData.gpa;
+			return true;
+		}
+		return false;
+	}
+
+	UINT64 GetDirbase()
+	{
+		if (dirbase)
+		{
+			return dirbase;
+		}
+
+		Command cmd = { 0 };
+		cmd.DirbaseData.Dirbase = 0;
+		HyperVCall(VMEXIT_KEY, VMX_COMMAND::CURRENT_DIRBASE, &cmd);
+		dirbase = cmd.DirbaseData.Dirbase;
+		if (!dirbase)
+		{
+			return 0;
+		}
+		return dirbase;
+	}
+
+};
+
+HookFunc h;
+
+#pragma section(".mysection", execute,read,write)
+#pragma section(".s11",read,write)
+__declspec(allocate(".s11")) int i[4096];
+
+
+int TestFunction(int a, int b)
+{
+	return a + b;
 }
 
 int FuckTestFunction(int a, int b)
 {
-	return a * b;
+	auto o = h.GetOldPtr();
+	auto c = ((int(*)(int, int))o)(1,5);
+	return a * b * c;
 }
 
-int a = 1;
-
-
+// 丢到最后一个节  下面会读函数内容 防止他俩在同1个页面内 导致eptv无限循环
+__declspec(code_seg(".mysection"))
 int main()
 {
 	UINT64 Result = HyperVCall(VMEXIT_KEY, VMX_COMMAND::CHECK_LOAD, 0);
@@ -350,62 +519,46 @@ int main()
 
 	
 	// hook测试函数
+	// debug 模式 msvc 会代理一层jmp 所以需要找到实际函数地址 
+	UINT64 jmpTestFunAdr = (UINT64)&TestFunction;
+	UINT32 offset = *(UINT32*)(jmpTestFunAdr + 1);
+	UINT64 TestFunAdr = jmpTestFunAdr + 5 + offset;
 
-#define ALIGN_TO_4KB_UP(address) (((address) + 4095) & ~4095)	// 向后对齐4K
-#define ALIGN_TO_4KB_DOWN(address) ((address) & ~4095)			// 向前对齐4K
+	UINT64 jmpFuckFunAdr = (UINT64)&FuckTestFunction;
+	UINT32 offset1 = *(UINT32*)(jmpFuckFunAdr + 1);
+	UINT64 FuckFunAdr = jmpFuckFunAdr + 5 + offset1;
 
-
-	printf("TestFunction(2,4) is %d \n", TestFunction(2, 4));
-	printf("TestFunction 字节码: \n");
+	printf("===== before hook =====\n");
+	printf("[?] TestFunction(2,4) is %d \n", TestFunction(2, 4));
+	printf("[?] TestFunction 字节码: \n");
 	for (int i = 0; i < 10; ++i)
 	{
-		unsigned char bt = ((unsigned char*)&TestFunction)[i];
+		unsigned char bt = ((unsigned char*)TestFunAdr)[i];
 		printf("%02x ", bt);
 	}
 	printf("\n");
 
-	UINT32 delta = (UINT64)&FuckTestFunction - (UINT64)&TestFunction - 5;
-	printf("delta is %x \n", delta);
+	auto res = h.Hook((void*)TestFunAdr, (void*)FuckFunAdr, 20, 2);
 
-	void* fuckpage4k = malloc(0x1000);
-	memset(fuckpage4k, 0, 0x1000);
-
-	/**
-	 *	hook step： (前提 2m分割为4k) 
-	 *	1. 获取到 TestFunction 的 pa
-	 *	2. pa位移到页面首地址
-	 *	3. 从物理页面拷贝4kb 到fuckpage
-	 *	4. 把fuckpage 的第二步偏移+1 处4字节地址改成 delta   （vs debug app 每个函数前面会嵌套一个jmp  方便测试hook，release的话需要构建跳转字节） 
-	 *	5. 把 pt 的pfn 指向这个物理页面首地址 改为只执行属性
-	 *	6. 触发违规后  如果是这个地址  则给他循环恢复为  读写/执行
-	 */
-
-	cmd.TranslateData.gva = (UINT64)&TestFunction;
-	cmd.TranslateData.dirbase = CurrentDirBase;
-	HyperVCall(VMEXIT_KEY, VMX_COMMAND::TRANSLATE_GVA2GPA, &cmd);
-	GPA testFunGpa = cmd.TranslateData.gpa;
-	printf("TestFun GPA is %llx \n", testFunGpa);
-	printf("TestFun GVA is %llx \n", cmd.TranslateData.gva);
-
-	cmd.ShadowPage.gpa = testFunGpa;
-	HyperVCall(VMEXIT_KEY, VMX_COMMAND::COVER_PAGE_2M_TO_4K, &cmd);
-	printf("Cover TestFun To 4kb Page\n");
-
-
-	GPA testFunPageAddr = (testFunGpa >> 12) << 12;
-	printf("TestFun Page GPA is %llx \n", testFunPageAddr);
-	UINT32 offset = testFunGpa - testFunPageAddr;
-	printf("TestFun Addr Page offset is %d \n", offset);
-
-	cmd.CopyData.SrcGpa = testFunPageAddr;
-	cmd.CopyData.DestDirbase = CurrentDirBase;
-	cmd.CopyData.DestGva = (GVA)fuckpage4k;
-	cmd.CopyData.Size = 0x1000;
-	HyperVCall(VMEXIT_KEY, VMX_COMMAND::READ_GUEST_PHY, &cmd);
-
-
+	printf("===== after hook =====\n");
+	while (1)
+	{
+		system("pause");
+		printf("TestFunction(2,4) is %d \n", TestFunction(2, 4));
+		system("pause");
+		printf("Hook 后TestFunction 字节码: \n");
+		for (int i = 0; i < 10; ++i)
+		{
+			unsigned char bt = ((unsigned char*)TestFunAdr)[i];
+			printf("%02x ", bt);
+		}
+		printf("\n");
+	}
 
 	endp:
 	system("pause");
 	return 0;
 }
+
+
+

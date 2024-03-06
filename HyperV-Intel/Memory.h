@@ -16,8 +16,11 @@ enum MAP_MEMTORY_INDEX
 #pragma section(".pd", read, write)
 #pragma section(".pt", read, write)
 #pragma section(".sdpt", read, write)
+#pragma section(".sdhk", read, write)
 
-extern ShadowPt g_shadow_pt[10];
+#define MAX_SHADOW_PT_SIZE 10
+extern ShadowPt g_shadow_pt[MAX_SHADOW_PT_SIZE];
+extern HookInfo g_hook_info[MAX_SHADOW_PT_SIZE];
 
 
 UINT64 GetMapVirtual(UINT16 offset, MAP_MEMTORY_INDEX index);

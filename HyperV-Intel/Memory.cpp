@@ -8,7 +8,24 @@ pml4e* g_HvSelfRefPml4 = (pml4e*)SELF_REF_PML4;
 __declspec(allocate(".pdpt")) pdpte g_pdpt[512];
 __declspec(allocate(".pd")) pde g_pd[512];
 __declspec(allocate(".pt")) pte g_pt[512];
-__declspec(allocate(".sdpt")) ShadowPt g_shadow_pt[10];
+
+__declspec(allocate(".sdpt")) ShadowPt g_shadow_pt[MAX_SHADOW_PT_SIZE];
+__declspec(allocate(".sdhk")) HookInfo g_hook_info[MAX_SHADOW_PT_SIZE];
+bool g_Init_Shadow = false;
+
+void InitShadowData()
+{
+	if (!g_Init_Shadow)
+	{
+		DBG::Print("Init ShadowData\n");
+		g_Init_Shadow = true;
+		for (int i = 0; i < MAX_SHADOW_PT_SIZE; ++i)
+		{
+			g_shadow_pt[i].use = false;
+			g_hook_info[i].use = false;
+		}
+	}
+}
 
 
 UINT64 GetMapVirtual(UINT16 offset, MAP_MEMTORY_INDEX index)
@@ -185,6 +202,8 @@ HVA GvaToHva(UINT64 Dirbase, GVA GuestVirAddr, MAP_MEMTORY_INDEX index)
 
 BOOL InitPageTable()
 {
+	InitShadowData();
+
 	HPA pdpt_phys = HvaToHpa((HVA)g_pdpt);
 	DBG::Print("InitPageTable: pdpt_phys is %llx \n", pdpt_phys);
 
@@ -197,7 +216,10 @@ BOOL InitPageTable()
 	HPA shadow_pt = HvaToHpa((HVA)&g_shadow_pt[0]);
 	DBG::Print("InitPageTable: shadow_pt is %llx \n", shadow_pt);
 
-	if (!pdpt_phys || !pd_phys || !pt_phys || !shadow_pt)
+	HPA hookinfo = HvaToHpa((HVA)&g_hook_info[0]);
+	DBG::Print("InitPageTable: hookinfo is %llx \n", hookinfo);
+
+	if (!pdpt_phys || !pd_phys || !pt_phys || !shadow_pt || !hookinfo)
 		return FALSE;
 
 	// ÉèÖÃÓ³ÉäÒ³±íÏî¡£¡£¡£
