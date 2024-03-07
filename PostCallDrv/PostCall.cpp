@@ -15,6 +15,7 @@ void Run(void* params)
 {
 	Sleep(30 * 1000);
 
+	g_PostCallMapperContext.postCallLoadSysPath;
 
 	while (1)
 	{

@@ -12,7 +12,7 @@ MapperContext g_MapperContext = { 0 };
  
 int main(int argc,char** argv)
 {
-    cxxopts::Options options("MyProgram", "One line description of MyProgram");
+    cxxopts::Options options("Voyager-Next Loader", "Voyager-Next Loader");
     options.add_options()
         ("s,spoofer", "change smbios")
         ("d,seed", "seed", cxxopts::value<std::string>()->default_value("0"))
@@ -67,7 +67,7 @@ int main(int argc,char** argv)
         auto pos = currentPath.find_last_of(L"\\");
         currentPath = currentPath.substr(0, pos);
 
-
+        // 保存参数到Context
         g_MapperContext.test = RandomInt(1000,9999);
         auto param_spoofer = result["spoofer"].as<bool>();
         g_MapperContext.RunWithSpoofer = param_spoofer?1:0;
@@ -78,6 +78,13 @@ int main(int argc,char** argv)
         {
             TextPrint("run with spoofer,seed is " + param_seed + "\n", Green);
         }
+        memset(&g_MapperContext.postCallLoadSysPath[0], 0, 255);
+        auto param_syspath = result["syspath"].as<std::string>();
+        if (param_syspath.length()>1 && param_syspath.length()<=250)
+        {
+            memcpy(&g_MapperContext.postCallLoadSysPath[0], param_syspath.c_str(), 255);
+        }
+
 
         std::string bootfwPathA = GetBootfwPath();
         std::wstring bootfwPath = String2Wstring(bootfwPathA);

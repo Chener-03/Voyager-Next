@@ -20,6 +20,9 @@ typedef struct _MapperContext
 	// postcall sys data
 	char PostCallSysData[1 * 1024 * 1024L]; //1MB
 
+	// postcall启动后map第三方sys路径
+	char* postCallLoadSysPath[255];
+
 	// hyperv data
 	char hvPayloadData[1 * 1024 * 1024L]; //1MB
 
@@ -29,6 +32,7 @@ typedef struct _MapperContext
 	MapFileStateCtx boot;				// \EFI\Microsoft\Boot
 	// 还原文件
 	unsigned short bootmgfwBackupPath[255];
+
 }MapperContext, * PMapperContext;
 
 

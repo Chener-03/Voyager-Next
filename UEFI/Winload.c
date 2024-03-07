@@ -226,6 +226,7 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 			VOID* KeQueryPerformanceCounter = GetExport(kernel_os_image_base, "KeQueryPerformanceCounter");
 			pcmc.KeQueryPerformanceCounterFunAddress = KeQueryPerformanceCounter;
 			pcmc.KeQueryPerformanceCounterParam = 0;
+			MemCopy(&pcmc.postCallLoadSysPath[0], &g_MapperContext.postCallLoadSysPath[0], 255);
 
 			void* gmp_export_addr = GetExportByIndex(lsp, 0);
 			if (gmp_export_addr)

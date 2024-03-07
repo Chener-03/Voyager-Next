@@ -17,6 +17,9 @@ typedef struct _PostCallMapperContext
 	void* KeQueryPerformanceCounterFunAddress;
 	void* KeQueryPerformanceCounterParam;
 
+	// postcall启动后map第三方sys路径
+	char* postCallLoadSysPath[255];
+
 }PostCallMapperContext, * PPostCallMapperContext;
 
 

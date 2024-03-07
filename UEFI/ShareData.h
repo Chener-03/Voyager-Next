@@ -20,6 +20,9 @@ typedef struct _MapperContext
 	// postcall sys data
 	char PostCallSysData[1 * 1024 * 1024L]; //1MB
 
+	// postcall启动后map第三方sys路径
+	char* postCallLoadSysPath[255];
+
 	// hyperv data
 	char hvPayloadData[1 * 1024 * 1024L]; //1MB
 
@@ -39,6 +42,9 @@ typedef struct _PostCallMapperContext
 	void* KernelModuleBase;
 	void* KeQueryPerformanceCounterFunAddress;
 	void* KeQueryPerformanceCounterParam;
+
+	// postcall启动后map第三方sys路径
+	char* postCallLoadSysPath[255];
 
 }PostCallMapperContext, * PPostCallMapperContext;
 
