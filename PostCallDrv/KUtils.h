@@ -3,15 +3,13 @@
 #include "Pch.h"
 #include "PEStructs.h"
 #include "ShareData.h"
+#include <winternl.h>
 
-typedef char CHAR8;
 
 
 UINT64 AsciiStrCmp(CHAR8* FirstString, CHAR8* SecondString);
 
-VOID* GetExport(PVOID ModuleBase, CHAR8* Name);
 
-VOID* GetExportByIndex(PVOID ModuleBase, UINT16 Index);
 
 VOID Sleep(int msec);
 
@@ -83,3 +81,48 @@ PVOID KAlloc(UINT32 Size, bool exec = false);
 
 VOID KFree(VOID* Buffer);
 
+
+BOOLEAN ReadFile(char* path, __out void** data, __out UINT32* size);
+
+
+
+
+UINT64 GetKernelModuleAddress(const char* module_name) {
+	void* buffer = nullptr;
+	DWORD buffer_size = 0;
+
+	NTSTATUS status = NtQuerySystemInformation(SystemModuleInformation, buffer, buffer_size, &buffer_size);
+
+	while (status == STATUS_INFO_LENGTH_MISMATCH) {
+		if (buffer != nullptr)
+			KFree(buffer);
+
+		buffer = KAlloc(buffer_size);
+		status = NtQuerySystemInformation(SystemModuleInformation, buffer, buffer_size, &buffer_size);
+	}
+
+	if (!NT_SUCCESS(status)) {
+		if (buffer != nullptr)
+			KFree(buffer);
+		return 0;
+	}
+
+	const auto modules = PRTL_PROCESS_MODULES (buffer);
+	if (!modules)
+		return 0;
+
+	for (auto i = 0u; i < modules->NumberOfModules; ++i) {
+		const std::string current_module_name = std::string(reinterpret_cast<char*>(modules->Modules[i].FullPathName) + modules->Modules[i].OffsetToFileName);
+
+		if (!_stricmp(current_module_name.c_str(), module_name.c_str()))
+		{
+			const uint64_t result = reinterpret_cast<uint64_t>(modules->Modules[i].ImageBase);
+
+			VirtualFree(buffer, 0, MEM_RELEASE);
+			return result;
+		}
+	}
+
+	VirtualFree(buffer, 0, MEM_RELEASE);
+	return 0;
+}

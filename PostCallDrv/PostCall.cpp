@@ -1,7 +1,8 @@
 #include "Pch.h"
 #include "KUtils.h"
 #include "ShareData.h"
-
+#include "Mapper.h"
+#include "Pe.h"
 
 
 extern "C" {
@@ -9,13 +10,14 @@ extern "C" {
 	__declspec(dllexport) PostCallMapperContext g_PostCallMapperContext = {};
 #pragma data_seg()
 }
-
+	
 
 void Run(void* params)
 {
-	Sleep(30 * 1000);
+	Sleep(60 * 1000);
 
-	g_PostCallMapperContext.postCallLoadSysPath;
+
+	MapSysFile();
 
 	while (1)
 	{

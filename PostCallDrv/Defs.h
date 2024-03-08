@@ -2,6 +2,8 @@
 #include "Pch.h"
 
 
+typedef char CHAR8;
+
 typedef enum _SYSTEM_INFORMATION_CLASS
 {
 	SystemBasicInformation = 0x0,

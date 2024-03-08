@@ -21,6 +21,12 @@
     <ClCompile Include="KUtils.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Mapper.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Pe.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ShareData.h">
@@ -36,6 +42,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Pch.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Mapper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Pe.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -93,12 +93,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Mapper.cpp" />
+    <ClCompile Include="Pe.cpp" />
     <ClCompile Include="PostCall.cpp" />
     <ClCompile Include="KUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Defs.h" />
+    <ClInclude Include="Mapper.h" />
     <ClInclude Include="Pch.h" />
+    <ClInclude Include="Pe.h" />
     <ClInclude Include="PEStructs.h" />
     <ClInclude Include="ShareData.h" />
     <ClInclude Include="KUtils.h" />
