@@ -20,5 +20,6 @@ VOID* GetExportByIndex(PVOID ModuleBase, UINT16 Index);
 
 PIMAGE_NT_HEADERS64 GetNtHeaders(void* ptr);
 
+VOID FixPeRelocTable(VOID* PeMemPtr);
 
-bool FixSecurityCookie(void* local_image, UINT64 kernel_image_base);
+BOOLEAN FixPeImport0(VOID* PeMemPtr);

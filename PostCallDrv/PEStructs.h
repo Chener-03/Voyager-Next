@@ -551,7 +551,7 @@ typedef struct tagACTCTXW32
 
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION {
-    HANDLE Section;				 // Not filled in
+    HANDLE Section;		 
     PVOID MappedBase;
     PVOID ImageBase;
     ULONG ImageSize;

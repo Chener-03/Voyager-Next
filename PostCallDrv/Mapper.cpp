@@ -1,7 +1,7 @@
 #include "Mapper.h" 
 #include "KUtils.h"
 #include "Pe.h"
-#include "../UEFI/EUtils.h"
+
 
 
 VOID MapSysFile()
@@ -24,6 +24,7 @@ VOID MapSysFile()
 	}
 
 
+
 	// Õ¹¿ªµ½ÄÚ´æ
 	auto memsize = header->OptionalHeader.SizeOfImage + 0x200;
 
@@ -32,6 +33,7 @@ VOID MapSysFile()
 	{
 		goto ENDP;
 	}
+
 
 	memcpy(memptr, data, header->OptionalHeader.SizeOfHeaders);
 	const PIMAGE_SECTION_HEADER current_image_section = IMAGE_FIRST_SECTION(header);
@@ -43,14 +45,24 @@ VOID MapSysFile()
 	}
 
 	// ÐÞ¸´reload
-	FixRelocImage(memptr);
+	FixPeRelocTable(memptr);
 
-	FixSecurityCookie(memptr, (UINT64)g_PostCallMapperContext.KernelModuleBase);
+	// ÐÞ¸´import
+	auto fi = FixPeImport0(memptr);
+	if (!fi)
+	{
+		goto ENDP;
+	}
 
+	// call ep
+	auto ep = reinterpret_cast<VOID(*)()>(reinterpret_cast<UINT64>(memptr) + header->OptionalHeader.AddressOfEntryPoint);
+	memset(memptr, 0, header->OptionalHeader.SizeOfHeaders);
 
-// ÐÞ¸´import
-// call ep
+	HANDLE handle;
+	PsCreateSystemThread(&handle, 0, 0, 0, 0, (PKSTART_ROUTINE)ep, 0);
+	ZwClose(handle);
 
+	DbgPrintEx(77, 0, "MapSysFile Success !\n");
 	
 ENDP:
 	if (data)

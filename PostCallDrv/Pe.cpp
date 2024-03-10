@@ -70,7 +70,7 @@ PIMAGE_NT_HEADERS64 GetNtHeaders(void* ptr)
 
 
 
-VOID FixRelocImage(VOID* PeMemPtr)
+VOID FixPeRelocTable(VOID* PeMemPtr)
 {
 	IMAGE_DOS_HEADER* DosHeader = (IMAGE_DOS_HEADER*)PeMemPtr;
 	IMAGE_NT_HEADERS64* NtHeader = (IMAGE_NT_HEADERS64*)((UINT64)PeMemPtr + DosHeader->e_lfanew);
@@ -118,42 +118,107 @@ VOID FixRelocImage(VOID* PeMemPtr)
 }
 
 
-// by kdmapper
-bool FixSecurityCookie(void* local_image, UINT64 kernel_image_base)
+
+
+BOOLEAN FixPeImport0(VOID* PeMemPtr)
 {
-	auto headers = GetNtHeaders(local_image);
-	if (!headers)
-		return false;
+	DbgPrintEx(77, 0, "FixPeImport0 .. !\n");
+	IMAGE_DOS_HEADER* DosHeader = (IMAGE_DOS_HEADER*)PeMemPtr;
+	IMAGE_NT_HEADERS64* NtHeader = (IMAGE_NT_HEADERS64*)((UINT64)PeMemPtr + DosHeader->e_lfanew);
+	UINT32 import_va = NtHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
 
-	auto load_config_directory = headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG].VirtualAddress;
-	if (!load_config_directory)
+	if (import_va == 0)
 	{
-		return true;
-	}
-	
-	auto load_config_struct = (PIMAGE_LOAD_CONFIG_DIRECTORY64)((uintptr_t)local_image + load_config_directory);
-	auto stack_cookie = load_config_struct->SecurityCookie;
-	if (!stack_cookie)
-	{ 
-		return true; // as I said, it is not an error and we should allow that behavior
+		return TRUE;
 	}
 
-	stack_cookie = stack_cookie - (uintptr_t)kernel_image_base + (uintptr_t)local_image; //since our local image is already relocated the base returned will be kernel address
+	IMAGE_IMPORT_DESCRIPTOR* current_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR*)((UINT64)(PeMemPtr)+import_va);
 
-	if (*(uintptr_t*)(stack_cookie) != 0x2B992DDFA232) { 
-		return false;
-	} 
+	struct ModuleAddr
+	{
+		bool use = false;
+		char name[100];
+		UINT64 addr;
+	};
 
-	auto new_cookie = 0x2B992DDFA232 ^ (UINT32)PsGetCurrentProcessId() ^ (UINT32)PsGetCurrentProcessId(); // here we don't really care about the value of stack cookie, it will still works and produce nice result
-	if (new_cookie == 0x2B992DDFA232)
-		new_cookie = 0x2B992DDFA233;
+	// ModuleAddr moduleCache[3] = { 0 };
 
-	*(uintptr_t*)(stack_cookie) = new_cookie; // the _security_cookie_complement will be init by the driver itself if they use crt
-	return true;
+	ModuleAddr* moduleCache = (ModuleAddr*)KAlloc(sizeof(ModuleAddr) * 100);
+	RtlIsZeroMemory(moduleCache, sizeof(ModuleAddr) * 100);
+
+	while (current_import_descriptor->FirstThunk) {
+
+		char* module_name = (char*)((UINT64)(PeMemPtr)+current_import_descriptor->Name);
+
+		PVOID ModelBase = 0;
+
+		for (int i = 0; i < 100; ++i)
+		{
+			auto& cache = moduleCache[i];
+			if (!cache.use)
+			{
+				continue;
+			}
+			if (strcmp(cache.name, module_name) == 0)
+			{
+				ModelBase = (PVOID)cache.addr;
+				break;
+			}
+		}
+
+		if (ModelBase == 0)
+		{
+			ModelBase = (PVOID)GetKernelModuleAddress(module_name);
+			if (ModelBase)
+			{
+				for (int i = 0; i < 100; ++i)
+				{
+					auto& cache = moduleCache[i];
+					if (!cache.use)
+					{
+						cache.use = true;
+						strcpy(cache.name, module_name);
+						cache.addr = (UINT64)ModelBase;
+						break;
+					}
+				}
+			}
+		}
+
+		if (ModelBase == 0)
+		{
+			return FALSE;
+		}
+
+		PIMAGE_THUNK_DATA64 current_first_thunk = (PIMAGE_THUNK_DATA64)((UINT64)(PeMemPtr)+current_import_descriptor->FirstThunk);
+		PIMAGE_THUNK_DATA64 current_originalFirstThunk = (PIMAGE_THUNK_DATA64)((UINT64)(PeMemPtr)+current_import_descriptor->OriginalFirstThunk);
+		
+		while (current_originalFirstThunk->u1.Function) {
+			IMAGE_IMPORT_BY_NAME* thunk_data = (IMAGE_IMPORT_BY_NAME*)((UINT64)(PeMemPtr)+current_originalFirstThunk->u1.AddressOfData);
+			char* funName = thunk_data->Name;
+			UINT64* funAddr = (UINT64*)&current_first_thunk->u1.Function;
+
+			void* knFunAddress = GetExport(ModelBase, funName);
+
+			if (knFunAddress)
+			{
+				*funAddr = (UINT64)knFunAddress;
+			}
+
+			++current_originalFirstThunk;
+			++current_first_thunk;
+		}
+
+		++current_import_descriptor;
+	}
+
+	if (moduleCache)
+	{
+		KFree(moduleCache);
+	}
+
+	return TRUE;
 }
-
-
-
 
 
 

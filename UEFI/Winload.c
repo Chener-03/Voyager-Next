@@ -246,6 +246,14 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 				UINT64 postCallEp = (UINT64)lsp + head->OptionalHeader.AddressOfEntryPoint;
 				INT32 CallOffset = (UINT64)postCallEp - ((UINT64)CallKeQueryPerformanceCounterPtr + 5);
 				*(INT32*)&CallKeQueryPerformanceCounterPtr[1] = CallOffset;
+
+				// remove pe header
+				auto clearHeaderSize = head->OptionalHeader.SizeOfHeaders;
+				for (int i = 0; i < clearHeaderSize; ++i)
+				{
+					*(unsigned char*)((UINT64)lsp + i) = 0;
+				}
+				
 			}
 		}
 

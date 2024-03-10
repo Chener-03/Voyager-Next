@@ -4,6 +4,9 @@
 
 typedef char CHAR8;
 
+typedef unsigned short WORD;
+typedef unsigned int DWORD;
+
 typedef enum _SYSTEM_INFORMATION_CLASS
 {
 	SystemBasicInformation = 0x0,
@@ -306,4 +309,11 @@ extern "C" NTSTATUS NTAPI ExRaiseHardError(
 	ULONG ResponseOption,
 	PULONG Response
 );
- 
+
+
+extern "C" NTSTATUS NTAPI NtQuerySystemInformation(
+	IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
+	OUT PVOID SystemInformation,
+	IN ULONG SystemInformationLength,
+	OUT PULONG ReturnLength OPTIONAL
+);

@@ -123,7 +123,7 @@ void vmexit_handler(PVmContext context, void* unknown)
 					HPA hpa = GpaToHpa(gpa, MAP_MEMTORY_INDEX::P2);   // 一般情况下 hpa和gpa都一样
 
 					auto oldPt = GetEptPt(eptp, cmd.ShadowPage.gpa);
-		
+	
 					auto info = &g_hook_info[cmd.ShadowPage.index];
 
 					if (info->use == false)
@@ -194,7 +194,6 @@ void vmexit_handler(PVmContext context, void* unknown)
 						{
 							DBG::Print("error by exec_failure\n");
 						}
-
 
 						if (read_failure || write_failure)
 						{

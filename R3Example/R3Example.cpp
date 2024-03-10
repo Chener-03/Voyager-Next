@@ -8,23 +8,6 @@
 
 #define VMEXIT_KEY 0x20240101ABCD
 
-#define SELF_REF_PML4_IDX 510
-#define MAPPING_PML4_IDX 100
-
-#define MAPPING_ADDRESS_BASE 0x0000327FFFE00000
-#define SELF_REF_PML4 0xFFFFFF7FBFDFE000
-
-constexpr auto PAGE_4KB = (0x1000);
-constexpr auto PAGE_2MB = (0x1000 * 512);
-constexpr auto PAGE_1GB = (0x1000 * 512 * 512);
-
-#ifndef max
-#define max(a,b)            (((a) > (b)) ? (a) : (b))
-#endif
-
-#ifndef min
-#define min(a,b)            (((a) < (b)) ? (a) : (b))
-#endif
 
 #define __OUT__ 
 #define  __IN__
@@ -147,35 +130,7 @@ typedef union Command
 
 };
 
-
-
-typedef struct _VmContext
-{
-	UINT64 rax;
-	UINT64 rcx;
-	UINT64 rdx;
-	UINT64 rbx;
-	UINT64 rsp;
-	UINT64 rbp;
-	UINT64 rsi;
-	UINT64 rdi;
-	UINT64 r8;
-	UINT64 r9;
-	UINT64 r10;
-	UINT64 r11;
-	UINT64 r12;
-	UINT64 r13;
-	UINT64 r14;
-	UINT64 r15;
-	UINT128 xmm0;
-	UINT128 xmm1;
-	UINT128 xmm2;
-	UINT128 xmm3;
-	UINT128 xmm4;
-	UINT128 xmm5;
-} VmContext, * PVmContext;
-
-
+ 
 
 
 extern "C" unsigned long long HyperVCall(unsigned long long key, VMX_COMMAND cmd, void* data);

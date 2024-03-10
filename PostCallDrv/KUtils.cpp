@@ -1,5 +1,6 @@
 #include "KUtils.h"
-#include <string>
+#include "Defs.h"
+
 
 UINT64 AsciiStrCmp(CHAR8* FirstString, CHAR8* SecondString)
 {
@@ -154,7 +155,50 @@ BOOLEAN ReadFile(char* path,__out void** data,__out UINT32* size)
 	*data = cache;
 	*size = fileSize.QuadPart;
 
+	ZwClose(fileHandle);
 	return TRUE;
 }
 
+
+
+UINT64 GetKernelModuleAddress(const char* module_name) {
+	void* buffer = nullptr;
+	DWORD buffer_size = 0;
+
+	NTSTATUS status = NtQuerySystemInformation(SystemModuleInformation, buffer, buffer_size, (PULONG) & buffer_size);
+
+	while (status == STATUS_INFO_LENGTH_MISMATCH) {
+		if (buffer != nullptr)
+			KFree(buffer);
+
+		buffer = KAlloc(buffer_size);
+		status = NtQuerySystemInformation(SystemModuleInformation, buffer, buffer_size, (PULONG) & buffer_size);
+	}
+
+	if (!NT_SUCCESS(status)) {
+		if (buffer != nullptr)
+			KFree(buffer);
+		return 0;
+	}
+
+	const auto modules = (PRTL_PROCESS_MODULES)buffer;
+	if (!modules)
+		return 0;
+
+	for (auto i = 0u; i < modules->NumberOfModules; ++i) {
+
+		auto current_module_name = reinterpret_cast<char*>(modules->Modules[i].FullPathName) + modules->Modules[i].OffsetToFileName;
+
+		if (strcmp(module_name, current_module_name) == 0)
+		{
+			UINT64 result = reinterpret_cast<UINT64>(modules->Modules[i].ImageBase);
+
+			KFree(buffer);
+			return result;
+		}
+	}
+
+	KFree(buffer);
+	return 0;
+}
 

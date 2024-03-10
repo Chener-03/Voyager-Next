@@ -80,7 +80,7 @@ int main(int argc,char** argv)
         }
         memset(&g_MapperContext.postCallLoadSysPath[0], 0, 255);
         auto param_syspath = result["syspath"].as<std::string>();
-        param_syspath = "C:\\Users\\c\\Desktop\\2\\R0Example.sys";
+        param_syspath = "C:\\Users\\chen\\Desktop\\2\\R0Example.sys";
         if (param_syspath.length()>1 && param_syspath.length()<=250)
         {
             memcpy(&g_MapperContext.postCallLoadSysPath[0], param_syspath.c_str(), 255);

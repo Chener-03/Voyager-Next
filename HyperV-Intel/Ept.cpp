@@ -119,11 +119,12 @@ BOOL SetEptPtAttr(ept_pointer eptp, GPA gpa, UINT64 pfn, bool canExec)
 	Address gpaAddr = { gpa };
 
 	UINT64 epml4_base_pa = eptp.page_frame_number << 12;
-	UINT64 epml4_base_va = HpaToHva(epml4_base_pa, MAP_MEMTORY_INDEX::P1);
+	UINT64 epml4_base_va = HpaToHva(epml4_base_pa, MAP_MEMTORY_INDEX::P2);
 
 	ept_pml4e eplm4e = ((ept_pml4e*)epml4_base_va)[gpaAddr.Type4KB.pml4_index];
 
 	UINT64 pdpt_base_pa = eplm4e.page_frame_number << 12;
+
 	UINT64 pdpt_base_va = HpaToHva(pdpt_base_pa, MAP_MEMTORY_INDEX::P1);
 
 	ept_pdpte pdpt = ((ept_pdpte*)pdpt_base_va)[gpaAddr.Type4KB.pdpt_index];
@@ -162,7 +163,7 @@ BOOL SetEptPtAttr(ept_pointer eptp, GPA gpa, UINT64 pfn, bool canExec)
 		pt.read_access = 1;
 		pt.write_access = 1;
 	}
-
+	UtilInveptGlobal(eptp);
 	return true;
 }
 
