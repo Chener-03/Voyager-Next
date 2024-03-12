@@ -354,7 +354,7 @@ EXTERN_C NTSTATUS MyNtOpenProcess(
 {
 	auto old = (pNtOpenProcess)openprocess->GetOldPtr();
 	// return STATUS_ACCESS_DENIED;
-	DbgPrintEx(77, 0, "NtOpenProcess Pid : %d .. !\n",ClientId->UniqueProcess);
+	// DbgPrintEx(77, 0, "NtOpenProcess Pid : %d .. !\n",ClientId->UniqueProcess);
 	auto r = old(ProcessHandle, DesiredAccess, ObjectAttributes, ClientId);
 	return r;
 }
@@ -386,6 +386,7 @@ EXTERN_C VOID DriverMapEnter()
 
 	HookFunc hf;
 	openprocess = &hf;
+
 
 	auto res = openprocess->Hook(&NtOpenProcess, &MyNtOpenProcess, 30, 0);
 	if (res)

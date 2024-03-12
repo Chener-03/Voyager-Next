@@ -10,7 +10,7 @@ UINT8 UtilInveptGlobal(ept_pointer eptPoint) {
 BOOL Is4kPage(ept_pointer eptp, GPA gpa)
 {
 	DBG::Print("HPA is %llx\n", gpa);
-	// gpa = (gpa >> 21) << 21;
+
 	Address gpaAddr = { gpa };
 
 	UINT64 epml4_base_pa = eptp.page_frame_number << 12;
@@ -33,7 +33,7 @@ BOOL Is4kPage(ept_pointer eptp, GPA gpa)
 	UINT64 pd_base_va = HpaToHva(pd_base_pa, MAP_MEMTORY_INDEX::P1);
 
 	ept_pde& pd = ((ept_pde*)pd_base_va)[gpaAddr.Type4KB.pd_index];
-	pde_2mb_64& pd_large = ((pde_2mb_64*)pd_base_va)[gpaAddr.Type4KB.pd_index];
+	epde_2mb& pd_large = ((epde_2mb*)pd_base_va)[gpaAddr.Type4KB.pd_index];
 
 	if (pd_large.large_page)
 	{
@@ -62,7 +62,7 @@ void Set2mbTo4kb(ept_pointer eptp, GPA gpa,UINT32 saveIndex)
 	UINT64 pdpt_base_va = HpaToHva(pdpt_base_pa, MAP_MEMTORY_INDEX::P1);
 
 	ept_pdpte pdpt = ((ept_pdpte*)pdpt_base_va)[gpaAddr.Type4KB.pdpt_index];
-	pdpte_1gb_64 pdpt_large = ((pdpte_1gb_64*)pdpt_base_va)[gpaAddr.Type4KB.pdpt_index];
+	ept_pdpte_1gb pdpt_large = ((ept_pdpte_1gb*)pdpt_base_va)[gpaAddr.Type4KB.pdpt_index];
 
 	if (pdpt_large.large_page)
 	{
@@ -73,8 +73,8 @@ void Set2mbTo4kb(ept_pointer eptp, GPA gpa,UINT32 saveIndex)
 	UINT64 pd_base_va = HpaToHva(pd_base_pa, MAP_MEMTORY_INDEX::P1);
 
 	ept_pde& pd = ((ept_pde*)pd_base_va)[gpaAddr.Type4KB.pd_index];
-	pde_2mb_64& pd_large = ((pde_2mb_64*)pd_base_va)[gpaAddr.Type4KB.pd_index];
-
+	epde_2mb& pd_large = ((epde_2mb*)pd_base_va)[gpaAddr.Type4KB.pd_index];
+	
 	if (pd_large.large_page)
 	{
 		ShadowPt* shadowPtVa = &g_shadow_pt[saveIndex];
@@ -96,6 +96,12 @@ void Set2mbTo4kb(ept_pointer eptp, GPA gpa,UINT32 saveIndex)
 			pt.read_access = 1;
 			pt.write_access = 1;
 			pt.execute_access = 1;
+
+			pt.user_mode_execute = pd_large.user_mode_execute;
+			pt.ignore_pat = pd_large.ignore_pat;
+			pt.memory_type = pd_large.memory_type;
+			pt.suppress_ve = pd_large.suppress_ve;
+
 			pt.page_frame_number = (gpa + i * PAGE_4KB) >> 12;
 		}
 
@@ -104,6 +110,7 @@ void Set2mbTo4kb(ept_pointer eptp, GPA gpa,UINT32 saveIndex)
 		pd.read_access = 1;
 		pd.write_access = 1;
 		pd.execute_access = 1;
+		pd.user_mode_execute = 1;
 		pd.page_frame_number = ptPa >> 12;
 		UtilInveptGlobal(eptp);
 		DBG::Print("Success spilt 2m to 4k! \n");
@@ -139,7 +146,7 @@ BOOL SetEptPtAttr(ept_pointer eptp, GPA gpa, UINT64 pfn, bool canExec)
 	UINT64 pd_base_va = HpaToHva(pd_base_pa, MAP_MEMTORY_INDEX::P1);
 
 	ept_pde& pd = ((ept_pde*)pd_base_va)[gpaAddr.Type4KB.pd_index];
-	pde_2mb_64& pd_large = ((pde_2mb_64*)pd_base_va)[gpaAddr.Type4KB.pd_index];
+	epde_2mb& pd_large = ((epde_2mb*)pd_base_va)[gpaAddr.Type4KB.pd_index];
 
 	if (pd_large.large_page)
 	{
@@ -191,7 +198,7 @@ ept_pte GetEptPt(ept_pointer eptp, GPA gpa)
 	UINT64 pd_base_va = HpaToHva(pd_base_pa, MAP_MEMTORY_INDEX::P1);
 
 	ept_pde& pd = ((ept_pde*)pd_base_va)[gpaAddr.Type4KB.pd_index];
-	pde_2mb_64& pd_large = ((pde_2mb_64*)pd_base_va)[gpaAddr.Type4KB.pd_index];
+	epde_2mb& pd_large = ((epde_2mb*)pd_base_va)[gpaAddr.Type4KB.pd_index];
 
 	if (pd_large.large_page)
 	{
