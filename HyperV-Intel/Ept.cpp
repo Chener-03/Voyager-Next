@@ -97,6 +97,7 @@ void Set2mbTo4kb(ept_pointer eptp, GPA gpa,UINT32 saveIndex)
 			pt.write_access = 1;
 			pt.execute_access = 1;
 
+			// 没有这四个物理机中会很卡 具体哪个字段影响还没测..
 			pt.user_mode_execute = pd_large.user_mode_execute;
 			pt.ignore_pat = pd_large.ignore_pat;
 			pt.memory_type = pd_large.memory_type;
