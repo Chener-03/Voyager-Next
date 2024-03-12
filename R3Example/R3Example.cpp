@@ -222,7 +222,7 @@ public:
 		//构建跳转原函数的内存区域
 		memcpy(callOldJmpCode, funAddr, hookSize);
 		memcpy((void*)((UINT64)callOldJmpCode + hookSize), &jmpOldCode[0], jmpOldCodeLen);
-		UINT64 old_ret_pos = (UINT64)fuckPage4k + offset + hookSize;
+		UINT64 old_ret_pos = (UINT64)funAddr + hookSize;
 		memcpy((void*)((UINT64)callOldJmpCode + hookSize + 6), &old_ret_pos, 8);
 
 

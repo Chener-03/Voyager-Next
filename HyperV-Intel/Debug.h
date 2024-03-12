@@ -8,7 +8,7 @@
 #define SERIAL_PORT_2 0x3E8 /* COM3, ttyS2 */
 #define SERIAL_PORT_3 0x2E8 /* COM4, ttyS3 */
 
-#define PORT_NUM SERIAL_PORT_0
+#define PORT_NUM SERIAL_PORT_1
 
 /*
 	UART Register Offsets

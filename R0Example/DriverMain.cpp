@@ -161,41 +161,14 @@ VOID Sleep(int msec)
 
 
 PVOID KAlloc(UINT32 Size, bool exec) {
-
-	PHYSICAL_ADDRESS MaxAddr = { 0 };
-	MaxAddr.QuadPart = -1;
-	PVOID addr = MmAllocateContiguousMemory(Size, MaxAddr);
-	if (addr)
-		RtlSecureZeroMemory(addr, Size);
-	else
-		return 0;
-
-	if (exec)
-	{
-		// 设置内存属性为可执行
-		PMDL mdl = IoAllocateMdl(addr, Size, FALSE, FALSE, NULL);
-		if (!mdl) {
-			MmFreeContiguousMemory(addr);
-			return 0;
-		}
-
-		MmBuildMdlForNonPagedPool(mdl);
-
-		// 将内存属性设置为 PAGE_EXECUTE_READWRITE
-		MmProtectMdlSystemAddress(mdl, PAGE_EXECUTE_READWRITE );
-
-
-		// 释放 Mdl 
-		IoFreeMdl(mdl);
-	}
-
-	return addr;
+	PVOID ptr = ExAllocatePool2(exec ? POOL_FLAG_NON_PAGED_EXECUTE : POOL_FLAG_NON_PAGED, Size, 'KVN');
+	return ptr;
 }
 
 VOID KFree(VOID* Buffer) {
-	// ExFreePoolWithTag(Buffer, 'KVN');
-	if (Buffer) MmFreeContiguousMemory((PVOID)Buffer);
+	ExFreePoolWithTag(Buffer, 'KVN');
 }
+
 
 
 class HookFunc
@@ -217,17 +190,17 @@ public:
 			return false;
 		}
 
+		if (!callOldJmpCode)
+		{
+			callOldJmpCode = KAlloc(hookSize + jmpOldCodeLen + 10,true);
+			memset(callOldJmpCode, 0x90, hookSize + jmpOldCodeLen + 10);
+		}
+
 		if (!fuckPage4k && !MallocFuckPageMemory())
 		{
 			return false;
 		}
 
-		if (!callOldJmpCode)
-		{
-			// callOldJmpCode = VirtualAlloc(NULL, hookSize + jmpOldCodeLen + 10, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-			callOldJmpCode = KAlloc(hookSize + jmpOldCodeLen + 10,true);
-			memset(callOldJmpCode, 0x90, hookSize + jmpOldCodeLen + 10);
-		}
 
 		// 获取funAddr的gpa
 		Command cmd = { 0 };
@@ -259,7 +232,7 @@ public:
 		//构建跳转原函数的内存区域
 		memcpy(callOldJmpCode, funAddr, hookSize);
 		memcpy((void*)((UINT64)callOldJmpCode + hookSize), &jmpOldCode[0], jmpOldCodeLen);
-		UINT64 old_ret_pos = (UINT64)fuckPage4k + offset + hookSize;
+		UINT64 old_ret_pos = (UINT64)funAddr + hookSize;
 		memcpy((void*)((UINT64)callOldJmpCode + hookSize + 6), &old_ret_pos, 8);
 
 
@@ -281,6 +254,7 @@ public:
 		memcpy((void*)(fuckPageFuncAddr + 2), &selfFunAddr, 8);
 
 
+
 		// 挂载fuckpage到ept
 		cmd.ShadowPage.dirbase = GetDirbase();
 		cmd.ShadowPage.gva = (GVA)fuckPage4k;
@@ -289,22 +263,13 @@ public:
 		HyperVCall(VMEXIT_KEY, VMX_COMMAND::REPLACE_4K_PAGE, &cmd);
 
 
-		auto oldpageptr = (((UINT64)funAddr) >> 12) << 12;
-		// RtlCopyMemory((void*)oldpageptr, fuckPage4k, 4096);
-		// cmd.CopyData.DestDirbase = GetDirbase();
-		// cmd.CopyData.SrcDirbase = GetDirbase();
-		// cmd.CopyData.DestGva = oldpageptr;
-		// cmd.CopyData.SrcGva = (UINT64)fuckPage4k;
-		// cmd.CopyData.Size = 4096;
-		// HyperVCall(VMEXIT_KEY, VMX_COMMAND::COPY_GUEST_VIR, &cmd);
-
 		return true;
 	}
 
 
 
 
-	void* GetOldPtr()
+	void* GetOldPtr() const
 	{
 		return callOldJmpCode;
 	}
@@ -330,7 +295,6 @@ private:
 private:
 	bool MallocFuckPageMemory()
 	{
-		// fuckPage4k = VirtualAlloc(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 		fuckPage4k = KAlloc(4096,true);
 		memset(fuckPage4k, 0, 4096);
 		if (!GetDirbase())
@@ -371,24 +335,34 @@ private:
 };
 
 
-HookFunc* openprocess = nullptr;
+EXTERN_C HookFunc* openprocess = nullptr;
 
-NTSTATUS MyNtOpenProcess(
+
+typedef NTSTATUS(*pNtOpenProcess)(
+	PHANDLE            ProcessHandle,
+	ACCESS_MASK        DesiredAccess,
+	POBJECT_ATTRIBUTES ObjectAttributes,
+	PCLIENT_ID         ClientId
+	);
+
+EXTERN_C NTSTATUS MyNtOpenProcess(
 	PHANDLE            ProcessHandle,
 	ACCESS_MASK        DesiredAccess,
 	POBJECT_ATTRIBUTES ObjectAttributes,
 	PCLIENT_ID         ClientId
 )
 {
-	auto old = openprocess->GetOldPtr();
+	auto old = (pNtOpenProcess)openprocess->GetOldPtr();
 	// return STATUS_ACCESS_DENIED;
-	return ((NTSTATUS(*)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, PCLIENT_ID))old)(ProcessHandle, DesiredAccess, ObjectAttributes, ClientId);
+	DbgPrintEx(77, 0, "NtOpenProcess Pid : %d .. !\n",ClientId->UniqueProcess);
+	auto r = old(ProcessHandle, DesiredAccess, ObjectAttributes, ClientId);
+	return r;
 }
 
 
 
 
-VOID DriverMapEnter()
+EXTERN_C VOID DriverMapEnter()
 {
 	DbgPrintEx(77, 0, "R0Example Load .. !\n");
 
@@ -413,7 +387,7 @@ VOID DriverMapEnter()
 	HookFunc hf;
 	openprocess = &hf;
 
-	auto res = openprocess->Hook(&NtOpenProcess, &MyNtOpenProcess, 20, 0);
+	auto res = openprocess->Hook(&NtOpenProcess, &MyNtOpenProcess, 30, 0);
 	if (res)
 	{
 		DbgPrintEx(77, 0, "[+] hyper-v hook NtOpenProcess success .. !\n");
@@ -423,9 +397,10 @@ VOID DriverMapEnter()
 		DbgPrintEx(77, 0, "[-] hyper-v hook NtOpenProcess fail.. !\n");
 	}
 
-
-	Sleep(1000*60*60);
+	while (1)
+	{
+		Sleep(1000 * 60);
+	}
 	endp:
 	return;
-
 }
