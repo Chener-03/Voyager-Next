@@ -3,7 +3,7 @@
 
 
 
-#if WINVER == 2302
+#if WINVER == 2302 || WINVER == 2202
 
 /**
 	.text:00000000100BC504 48 8B C4                      mov     rax, rsp

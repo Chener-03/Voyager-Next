@@ -90,6 +90,13 @@ UINT64 EFIAPI BlImgAllocateImageBufferHook(VOID** imageBuffer,UINTN imageSize,UI
 }
 
 
+#if WINVER == 2202
+EFI_STATUS EFIAPI BlLdrLoadImageHook
+(
+	int a1, const CHAR16* ImagePath, const CHAR16* ModuleName, int ImageSize, int a5, int a6, PPLDR_DATA_TABLE_ENTRY lplpTableEntry,
+	__int64 a8, __int64 a9, int a10, int a11, int a12, int a13, int a14, __int64 a15, __int64 a16
+)
+#endif
 #if WINVER == 2302
 EFI_STATUS EFIAPI BlLdrLoadImageHook
 (
@@ -97,6 +104,7 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 	int a6, int a7, PPLDR_DATA_TABLE_ENTRY lplpTableEntry, UINT64 a9, UINT64 a10,
 	int a11, int a12, int a13, int a14, int a15, UINT64 a16, UINT64 a17
 )
+#endif
 {
 	/*
 	 * ½øÈëË³Ðò
@@ -110,9 +118,17 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 	}
 
 	DisableInlineHook(&g_Hooks[WinLoadImageShitHook]);
+
+#if WINVER == 2302
 	EFI_STATUS Result = ((LDR_LOAD_IMAGE)g_Hooks[WinLoadImageShitHook].Address)(a1, a2, ImagePath, ModuleName, ImageSize, 
 		a6, a7, lplpTableEntry, 
 		a9, a10, a11, a12, a13, a14, a15, a16, a17);
+#endif
+#if WINVER == 2202
+	EFI_STATUS Result = ((LDR_LOAD_IMAGE)g_Hooks[WinLoadImageShitHook].Address)(a1, ImagePath, ModuleName, ImageSize,
+		a5, a6, lplpTableEntry,
+		a8, a9, a10, a11, a12, a13, a14, a15, a16);
+#endif
 
 
 
@@ -235,9 +251,12 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 			}
 
 
-			//KeQueryPerformanceCounter
+			// KeQueryPerformanceCounter
 			{
-				//E8 ? ? ? ? 33 C9 E8 ? ? ? ? BB ? ? ? ? 48 89
+				//  KiSystemStartup --> KiInitializeKernel --> InitBootProcessor -->
+				//  PsInitSystem --> PspInitPhase0 --> Phase1Initialization --> Phase1InitializationDiscard -->
+				//  KeQueryPerformanceCounter
+				//  E8 ? ? ? ? 33 C9 E8 ? ? ? ? BB ? ? ? ? 48 89
 				UINT64 CallKeQueryPerformanceCounterPattner = FindPattern(TableEntry->ModuleBase, TableEntry->SizeOfImage,
 					"\xE8\x00\x00\x00\x00\x33\xC9\xE8\x00\x00\x00\x00\xBB\x00\x00\x00\x00\x48\x89",
 					"x????xxx????x????xx");
@@ -280,7 +299,7 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 
 	return Result;
 }
-#endif
+
 
 
 UINT64 BgpGxParseBitmapHook(UINT64 a1, unsigned int** a2)

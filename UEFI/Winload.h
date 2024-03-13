@@ -2,6 +2,45 @@
 #include "Pch.h"
 #include "Defs.h"
 
+
+#if WINVER == 2202
+
+
+#define ALLOCATE_IMAGE_BUFFER_SIG "\xE8\x00\x00\x00\x00\x8B\xD8\x85\xC0\x0F\x88\xCF\x00\x00\x00\x48\x8B"
+#define ALLOCATE_IMAGE_BUFFER_MASK "x????xxxxxxx???xx"
+
+#define BG_DISPLAY_STRING_SIG "\xB9\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x8B\xC8\xE8\x00\x00\x00\x00\x48"
+#define BG_DISPLAY_STRING_MASK "x??xxx????xxxx????x"
+
+#define BGP_GX_PARSE_BITMAP_SIG "\xE8\x00\x00\x00\x00\x8B\xD8\x85\xC0\x78\x1D\x48\x8B\x4C"
+#define BGP_GX_PARSE_BITMAP_MASK "x????xxxxxxxxx"
+
+
+#define BLP_ARCH_SWITCH_CONTEXT_SIG "40\x53\x48\x83\xEC\x20\x48\x8B\x15\x00\x00\x00\x00\x48\x8D\x05"
+#define BLP_ARCH_SWITCH_CONTEXT_MASK "xxxxxxxxx????xxx"
+
+
+// 48 03 D1 E8 ? ? ? ? ? 8B ? E8 ? ? ? ? 85 C0
+#define MI_FREE_KERNEL_PAD_SECTIONS_SIG "\x48\x03\xD1\xE8\x00\x00\x00\x00\x00\x8B\x00\xE8\x00\x00\x00\x00\x85\xC0"
+#define MI_FREE_KERNEL_PAD_SECTIONS_MASK "xxxx?????x?x????xx"
+
+
+#define MI_WRITE_PROTECT_SYSTEM_IMAGE_SIG  "\xE8\x00\x00\x00\x00\xF0\xFF\x0D\x00\x00\x00\x00\x48\x8B\xCE\xE8\x00\x00\x00\x00\x85\xC0"
+#define MI_WRITE_PROTECT_SYSTEM_IMAGE_MASK "x????xxx????xxxx????xx"
+
+
+
+typedef UINT64(EFIAPI* ALLOCATE_IMAGE_BUFFER)(VOID** imageBuffer, UINTN imageSize, UINT32 memoryType,
+	UINT32 attributes, VOID* unused, UINT32 Value);
+
+
+typedef EFI_STATUS(EFIAPI* LDR_LOAD_IMAGE)(int a1,const CHAR16* ImagePath,const CHAR16* ModuleName,int ImageSize,int a5,int a6,__int64 lplpTableEntry,
+	__int64 a8,__int64 a9,int a10,int a11,int a12,int a13,int a14,__int64 a15,__int64 a16);
+
+
+#endif
+
+
 #if WINVER == 2302
 /**
 	≤È’“ __int64 __fastcall BlImgAllocateImageBuffer(__int64 *a1, __int64 a2, unsigned int a3, unsigned int a4, int a5, int a6)
@@ -73,10 +112,11 @@
 
 
 // 48 03 D1 E8 ? ? ? ? ? 8B ? E8 ? ? ? ? 85 C0
+// MiInitializeDriverImages call  MiFreeKernelPadSections
 #define MI_FREE_KERNEL_PAD_SECTIONS_SIG "\x48\x03\xD1\xE8\x00\x00\x00\x00\x00\x8B\x00\xE8\x00\x00\x00\x00\x85\xC0"
 #define MI_FREE_KERNEL_PAD_SECTIONS_MASK "xxxx?????x?x????xx"
 
-
+//  MiInitSystem call MiWriteProtectSystemImages
 #define MI_WRITE_PROTECT_SYSTEM_IMAGE_SIG  "\xE8\x00\x00\x00\x00\xF0\xFF\x0D\x00\x00\x00\x00\x48\x8B\xCE"
 #define MI_WRITE_PROTECT_SYSTEM_IMAGE_MASK "x????xxx????xxx"
 

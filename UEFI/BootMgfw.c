@@ -319,7 +319,7 @@ EFI_STATUS EFIAPI InstallBootMgfwHooks(EFI_HANDLE ImageHandle)
 	if (!ArchStartBootApplication)
 		return EFI_NOT_FOUND;
 
-#if WINVER == 2302
+#if WINVER == 2302 || WINVER == 2202
 	MakeInlineHook(&g_Hooks[BootMgfwShitHook], ArchStartBootApplication, &ArchStartBootApplicationHook, TRUE);
 #endif
 	return EFI_SUCCESS;
