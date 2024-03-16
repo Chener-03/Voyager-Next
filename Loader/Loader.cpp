@@ -53,6 +53,7 @@ int main(int argc,char** argv)
 
     {
         DisableKvas();
+        DisableHvci(); // 不禁用内核隔离会无法在内核起线程  但是不影响hyperv hook工作
         EnableHyperV();
         DisableFastboot();
         // DeleteSvc("EventLog");

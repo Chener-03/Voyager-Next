@@ -70,6 +70,9 @@ VOID DisableFastboot();
 // 开启Hyper-V
 VOID EnableHyperV();
 
+// 禁用内核隔离
+VOID DisableHvci();
+
 // 获取服务列表
 std::pair<ENUM_SERVICE_STATUS_PROCESSA*, DWORD> GetSvcList(int ServiceState, int ServiceType = SERVICE_DRIVER);
 
